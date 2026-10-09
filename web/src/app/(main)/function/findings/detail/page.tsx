@@ -41,7 +41,7 @@ const FINDING_STATUSES: FindingStatus[] = [
 ];
 
 function fmtTime(ts: string) {
-  return new Date(ts).toLocaleString("zh-CN");
+  return new Date(ts).toLocaleString("ru-RU");
 }
 
 // FieldRow is one label/value line in the right-hand status panel.
@@ -85,10 +85,10 @@ function FindingDetailInner() {
       try {
         const updated = await api.setFindingSeverity(id, next);
         setFinding(updated);
-        toast.success(`严重等级已改为「${statusMeta("severity", next).label}」`);
+        toast.success(`Серьёзность изменена на «${statusMeta("severity", next).label}»`);
       } catch (e) {
         setFinding((cur) => (cur ? { ...cur, severity: prev } : cur));
-        toast.error("更新失败：" + (e as Error).message);
+        toast.error("Не удалось обновить: " + (e as Error).message);
       }
     },
     [finding, id],
@@ -102,10 +102,10 @@ function FindingDetailInner() {
       try {
         const updated = await api.setFindingStatus(id, next);
         setFinding(updated);
-        toast.success(`处理状态已改为「${statusMeta("finding", next).label}」`);
+        toast.success(`Статус обработки изменён на «${statusMeta("finding", next).label}»`);
       } catch (e) {
         setFinding((cur) => (cur ? { ...cur, status: prev } : cur));
-        toast.error("更新失败：" + (e as Error).message);
+        toast.error("Не удалось обновить: " + (e as Error).message);
       }
     },
     [finding, id],
@@ -114,11 +114,11 @@ function FindingDetailInner() {
   if (!finding) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
-        <p className="text-muted-foreground">{loaded ? `未找到发现 ${id}` : "加载中…"}</p>
+        <p className="text-muted-foreground">{loaded ? `Находка ${id} не найдена` : "Загрузка…"}</p>
         {loaded && (
           <Button asChild variant="outline">
             <Link href="/function/findings">
-              <ArrowLeftIcon /> 返回发现列表
+              <ArrowLeftIcon /> К списку находок
             </Link>
           </Button>
         )}
@@ -126,7 +126,7 @@ function FindingDetailInner() {
     );
   }
 
-  const title = finding.name || finding.vulnclass || "未分类";
+  const title = finding.name || finding.vulnclass || "Без категории";
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="flex flex-1 flex-col gap-0">
@@ -148,34 +148,34 @@ function FindingDetailInner() {
           <StatusBadge domain="severity" value={finding.severity} dot />
           <StatusBadge domain="finding" value={finding.status} dot />
           {finding.inherited && finding.source_task_id && (
-            <Badge variant="outline">来源任务 #{finding.source_task_id} · 只读</Badge>
+            <Badge variant="outline">Исходная задача #{finding.source_task_id} · только чтение</Badge>
           )}
         </div>
         <TabsList>
-          <TabsTrigger value="overview">概览</TabsTrigger>
-          <TabsTrigger value="lineage">链路图</TabsTrigger>
+          <TabsTrigger value="overview">Обзор</TabsTrigger>
+          <TabsTrigger value="lineage">Цепочка</TabsTrigger>
         </TabsList>
       </header>
 
       {/* Tab content */}
       <div className="flex-1 p-4 lg:p-6">
-        {/* 概览：左（摘要 + 证据）/ 右（状态区） */}
+        {/* Обзор: слева (сводка + доказательства) / справа (блок статуса) */}
         <TabsContent value="overview" className="mt-0">
           <div className="grid gap-4 lg:grid-cols-3">
-            {/* 左栏 */}
+            {/* Левая колонка */}
             <div className="flex flex-col gap-4 lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">摘要</CardTitle>
+                  <CardTitle className="text-sm">Сводка</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{finding.summary || "（无摘要）"}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{finding.summary || "(нет сводки)"}</p>
                 </CardContent>
               </Card>
               <FindingRetestPanel key={id} findingId={id} readOnly={finding.inherited} onCompleted={load} />
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">证据 / PoC</CardTitle>
+                  <CardTitle className="text-sm">Доказательства / PoC</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {finding.evidence ? (
@@ -183,7 +183,7 @@ function FindingDetailInner() {
                       {finding.evidence}
                     </pre>
                   ) : (
-                    <p className="text-sm text-muted-foreground">（无证据）</p>
+                    <p className="text-sm text-muted-foreground">(нет доказательств)</p>
                   )}
                 </CardContent>
               </Card>
@@ -194,42 +194,42 @@ function FindingDetailInner() {
                 readOnly={finding.inherited}
                 onChanged={load}
               />
-              {/* 证据下方：详细报告(Markdown 渲染) */}
+              {/* Под доказательствами: подробный отчёт (рендер Markdown) */}
               <Card>
                 <CardHeader className="flex-row items-center justify-between">
-                  <CardTitle className="text-sm">详细报告</CardTitle>
-                  {finding.report && <CopyButton text={finding.report} successMessage="已复制详细报告" />}
+                  <CardTitle className="text-sm">Подробный отчёт</CardTitle>
+                  {finding.report && <CopyButton text={finding.report} successMessage="Подробный отчёт скопирован" />}
                 </CardHeader>
                 <CardContent>
                   {finding.report_stale ? (
                     <Alert>
-                      <AlertDescription>流量证据已变更，详细报告待更新。</AlertDescription>
+                      <AlertDescription>Доказательства в трафике изменились, подробный отчёт ожидает обновления.</AlertDescription>
                     </Alert>
                   ) : null}
                   {finding.report ? (
                     <Markdown text={finding.report} />
                   ) : (
-                    <p className="text-sm text-muted-foreground">暂无详细报告。</p>
+                    <p className="text-sm text-muted-foreground">Подробного отчёта пока нет.</p>
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* 右栏：状态区 */}
+            {/* Правая колонка: блок статуса */}
             <Card className="h-fit lg:sticky lg:top-24">
               <CardHeader>
-                <CardTitle className="text-sm">状态</CardTitle>
+                <CardTitle className="text-sm">Статус</CardTitle>
               </CardHeader>
               <CardContent className="divide-y">
-                {/* 漏洞 ID */}
-                <FieldRow label="漏洞 ID">
+                {/* ID находки */}
+                <FieldRow label="ID находки">
                   <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                     #{finding.id}
                   </code>
                 </FieldRow>
 
-                {/* 严重等级 */}
-                <FieldRow label="严重等级">
+                {/* Серьёзность */}
+                <FieldRow label="Серьёзность">
                   {finding.inherited ? (
                     <StatusBadge domain="severity" value={finding.severity} dot />
                   ) : (
@@ -250,8 +250,8 @@ function FindingDetailInner() {
                   )}
                 </FieldRow>
 
-                {/* 处理状态 */}
-                <FieldRow label="处理状态">
+                {/* Статус обработки */}
+                <FieldRow label="Статус обработки">
                   {finding.inherited ? (
                     <StatusBadge domain="finding" value={finding.status} dot />
                   ) : (
@@ -272,8 +272,8 @@ function FindingDetailInner() {
                   )}
                 </FieldRow>
 
-                {/* 漏洞类型 */}
-                <FieldRow label="漏洞类型">
+                {/* Класс находки */}
+                <FieldRow label="Класс находки">
                   {finding.vulnclass ? (
                     <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{finding.vulnclass}</code>
                   ) : (
@@ -281,8 +281,8 @@ function FindingDetailInner() {
                   )}
                 </FieldRow>
 
-                {/* 涉及资产 */}
-                <FieldRow label="涉及资产">
+                {/* Затронутые активы */}
+                <FieldRow label="Затронутые активы">
                   {finding.assets && finding.assets.length > 0 ? (
                     <div className="flex flex-wrap justify-end gap-1">
                       {finding.assets.map((a) => (
@@ -300,8 +300,8 @@ function FindingDetailInner() {
                   )}
                 </FieldRow>
 
-                {/* 所属任务 */}
-                <FieldRow label="所属任务">
+                {/* Задача */}
+                <FieldRow label="Задача">
                   {finding.task_id ? (
                     <Link
                       href={`/function/tasks/detail?id=${finding.task_id}`}
@@ -312,12 +312,12 @@ function FindingDetailInner() {
                       <ArrowUpRightIcon className="size-3 shrink-0" />
                     </Link>
                   ) : (
-                    <span className="text-muted-foreground">—（任务已删除）</span>
+                    <span className="text-muted-foreground">— (задача удалена)</span>
                   )}
                 </FieldRow>
 
-                {/* 发现时间 */}
-                <FieldRow label="发现时间">
+                {/* Время обнаружения */}
+                <FieldRow label="Время обнаружения">
                   <span className="tabular-nums">{fmtTime(finding.ts)}</span>
                 </FieldRow>
               </CardContent>
@@ -325,7 +325,7 @@ function FindingDetailInner() {
           </div>
         </TabsContent>
 
-        {/* 链路图：从任务初始节点回溯到本漏洞节点的攻击链路 */}
+        {/* Цепочка: путь атаки от начального узла задачи до узла этой находки */}
         <TabsContent value="lineage" className="mt-0">
           <FindingLineageView findingId={finding.id} />
         </TabsContent>
