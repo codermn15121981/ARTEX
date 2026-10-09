@@ -8,173 +8,173 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 // ── DSL autocomplete ──────────────────────────────────────────────────────────
-// Shared by the global asset view (/function/assets) and the per-task 测试资产
+// Shared by the global asset view (/function/assets) and the per-task tested-assets
 // search, so both search boxes behave and look identical.
 
 const DSL_FIELDS: { name: string; desc: string; ops: { op: string; desc: string }[] }[] = [
   {
     name: "domain",
-    desc: "域名（根域名/子域名/服务域名）",
+    desc: "Домен (корневой/поддомен/домен сервиса)",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "ip",
-    desc: "IPv4/IPv6 地址",
+    desc: "Адрес IPv4/IPv6",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "url",
-    desc: "完整 URL（服务/接口）",
+    desc: "Полный URL (сервис/эндпоинт)",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "root_domain",
-    desc: "根域名",
+    desc: "Корневой домен",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "page_title",
-    desc: "页面标题（HTTP 服务）",
+    desc: "Заголовок страницы (HTTP-сервис)",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "icp",
-    desc: "ICP 备案号",
+    desc: "Номер регистрации ICP",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "service_name",
-    desc: "服务名称（非 HTTP 服务）",
+    desc: "Название сервиса (не HTTP)",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "app_name",
-    desc: "应用名称",
+    desc: "Название приложения",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "bundle_id",
-    desc: "应用 Bundle ID",
+    desc: "Bundle ID приложения",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "category",
-    desc: "应用分类",
+    desc: "Категория приложения",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "app_icp",
-    desc: "应用 ICP 备案",
+    desc: "Регистрация ICP приложения",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "method",
-    desc: "HTTP 方法 GET/POST/PUT/…",
+    desc: "HTTP-метод GET/POST/PUT/…",
     ops: [
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "service_type",
-    desc: "服务类型：http | other",
+    desc: "Тип сервиса: http | other",
     ops: [
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "record_type",
-    desc: "DNS 解析类型 A/CNAME/MX/…",
+    desc: "Тип DNS-записи A/CNAME/MX/…",
     ops: [
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "technology",
-    desc: "技术指纹（数组字段）",
+    desc: "Технологический отпечаток (поле-массив)",
     ops: [
-      { op: "=", desc: "模糊匹配" },
-      { op: "==", desc: "精确匹配" },
-      { op: "!=", desc: "排除" },
+      { op: "=", desc: "Нечёткое совпадение" },
+      { op: "==", desc: "Точное совпадение" },
+      { op: "!=", desc: "Исключить" },
     ],
   },
   {
     name: "port",
-    desc: "端口号（整数）",
+    desc: "Номер порта (целое число)",
     ops: [
-      { op: "==", desc: "等于" },
-      { op: "!=", desc: "不等于" },
-      { op: ">", desc: "大于" },
-      { op: ">=", desc: "大于等于" },
-      { op: "<", desc: "小于" },
-      { op: "<=", desc: "小于等于" },
+      { op: "==", desc: "Равно" },
+      { op: "!=", desc: "Не равно" },
+      { op: ">", desc: "Больше" },
+      { op: ">=", desc: "Больше или равно" },
+      { op: "<", desc: "Меньше" },
+      { op: "<=", desc: "Меньше или равно" },
     ],
   },
   {
     name: "status_code",
-    desc: "HTTP 状态码（整数）",
+    desc: "Код статуса HTTP (целое число)",
     ops: [
-      { op: "==", desc: "等于" },
-      { op: "!=", desc: "不等于" },
-      { op: ">", desc: "大于" },
-      { op: ">=", desc: "大于等于" },
-      { op: "<", desc: "小于" },
-      { op: "<=", desc: "小于等于" },
+      { op: "==", desc: "Равно" },
+      { op: "!=", desc: "Не равно" },
+      { op: ">", desc: "Больше" },
+      { op: ">=", desc: "Больше или равно" },
+      { op: "<", desc: "Меньше" },
+      { op: "<=", desc: "Меньше или равно" },
     ],
   },
-  { name: "company_id", desc: "归属企业 ID（整数）", ops: [{ op: "==", desc: "等于" }] },
-  { name: "task_id", desc: "来源任务 ID（整数）", ops: [{ op: "==", desc: "等于" }] },
+  { name: "company_id", desc: "ID компании (целое число)", ops: [{ op: "==", desc: "Равно" }] },
+  { name: "task_id", desc: "ID задачи-источника (целое число)", ops: [{ op: "==", desc: "Равно" }] },
 ];
 
 const LOGIC_OPS = [
-  { label: "AND", desc: "且（两个条件都满足）" },
-  { label: "OR", desc: "或（满足其中之一）" },
+  { label: "AND", desc: "И (выполняются оба условия)" },
+  { label: "OR", desc: "ИЛИ (выполняется хотя бы одно)" },
 ];
 
 interface DslSuggestion {
@@ -261,7 +261,7 @@ const KIND_STYLE: Record<string, string> = {
 };
 
 // AssetDslSearch is the shared DSL search box: a monospace input with a
-// field/operator/logic autocomplete popover and a status line ("找到 N 条" /
+// field/operator/logic autocomplete popover and a status line ("found N" /
 // error / loading). Used by both the global asset view and the per-task view.
 export function AssetDslSearch({
   query,
@@ -341,7 +341,7 @@ export function AssetDslSearch({
         <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
-          placeholder="DSL 搜索：domain=example AND status_code>=400"
+          placeholder="Поиск DSL: domain=example AND status_code>=400"
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -375,7 +375,7 @@ export function AssetDslSearch({
       </div>
       {query.trim() && !open && (
         <p className="pl-1 text-[11px] text-muted-foreground">
-          {loading ? "搜索中…" : error ? <span className="text-destructive">{error}</span> : `找到 ${count ?? 0} 条`}
+          {loading ? "Поиск…" : error ? <span className="text-destructive">{error}</span> : `Найдено: ${count ?? 0}`}
         </p>
       )}
     </div>
