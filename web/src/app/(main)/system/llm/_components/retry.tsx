@@ -1,13 +1,17 @@
 "use client";
 
-// LLM 重试配置的共用件：五层重试各自的「次数 + 间隔」。
+// Общий компонент настройки повторов LLM: «количество + интервал» для каждого из пяти слоёв повтора.
 //
-// 五层从内到外：建连(SDK) → 空响应(SDK) → 同 provider 安全窗口 → 轮询熔断 → 意图重跑。
-// 前三层跟着端点走，所以每个模型配置都能覆盖全局默认；后两层是进程级的，只有全局一份。
+// Пять слоёв от внутреннего к внешнему: установка соединения (SDK) → пустой ответ (SDK) →
+// защитное окно того же провайдера → автовыключатель ротации → повторный запуск намерения.
+// Первые три слоя привязаны к эндпоинту, поэтому каждая конфигурация модели может
+// переопределить глобальные значения по умолчанию; последние два — на уровне процесса,
+// есть только одна глобальная версия.
 //
-// 所有输入都遵循同一套「留空 = 不配置」语义，与后端 db.RetryRule 一致：
-//   次数   空/0 = 用内置默认 | -1 = 关闭这层重试 | >0 = 用这个次数
-//   间隔   空/0 = 用这层原本的指数退避 | >0 = 改用这个固定毫秒间隔
+// Все поля ввода следуют одной и той же семантике «пусто = не настроено», совпадающей с
+// db.RetryRule на backend'е:
+//   количество   пусто/0 = встроенное значение по умолчанию | -1 = выключить этот слой повтора | >0 = использовать это количество
+//   интервал     пусто/0 = исходный экспоненциальный backoff этого слоя | >0 = использовать этот фиксированный интервал в миллисекундах
 
 import * as React from "react";
 
@@ -34,89 +38,89 @@ const ZERO_POLICY: LLMRetryPolicy = {
 
 type LayerMeta = {
   title: string;
-  /** 这层重试发生在哪、由谁执行 */
+  /** Где происходит этот слой повтора и кто его выполняет */
   where: string;
-  /** 什么样的错误会走到这层——具体到状态码，别让人猜 */
+  /** Какие ошибки попадают в этот слой — вплоть до кода статуса, чтобы не гадать */
   trigger: string;
-  /** 长得像但【不】走这层的错误，省得填了没反应还以为是 bug */
+  /** Ошибки, похожие на эти, но [не] попадающие в этот слой — чтобы настройка без эффекта не выглядела как баг */
   skips?: string;
   desc: string;
   attemptsLabel: string;
-  /** 次数留空时的默认值，用于占位符 */
+  /** Значение по умолчанию при пустом количестве, для текста-подсказки */
   defAttempts: number;
-  /** 间隔留空时的默认策略，用于占位符 */
+  /** Стратегия по умолчанию при пустом интервале, для текста-подсказки */
   defInterval: string;
-  /** 次数填 -1 的含义 */
+  /** Что означает -1 в поле количества */
   offHint: string;
 };
 
 export const RETRY_LAYERS = {
   connect: {
-    title: "建连重试",
-    where: "SDK · 拿到 200 之前",
+    title: "Повтор установки соединения",
+    where: "SDK · до получения 200",
     trigger:
-      "连不上或还没拿到 200：连接重置 / 读写超时 / DNS 失败等网络层错误，以及 HTTP 408、429、500、502、503、504。",
-    skips: "其余状态码（400 / 401 / 403 / 404 / 413 / 422 等）都是确定性拒绝，重发也一样失败，直接上抛。",
-    desc: "原样重发同一个请求。流一旦开始（已经拿到 200），中途断开就不归这层管了。",
-    attemptsLabel: "重试次数",
+      "Не удаётся подключиться или ещё не получен 200: ошибки сетевого уровня — сброс соединения / таймаут чтения-записи / сбой DNS и т.п., а также HTTP 408, 429, 500, 502, 503, 504.",
+    skips: "Остальные коды статуса (400 / 401 / 403 / 404 / 413 / 422 и т.п.) — детерминированные отказы, повтор даст тот же результат, поэтому ошибка сразу передаётся наверх.",
+    desc: "Повторно отправляет тот же самый запрос без изменений. Если поток уже начался (200 получен), разрыв посередине этим слоем уже не обрабатывается.",
+    attemptsLabel: "Количество повторов",
     defAttempts: 3,
-    defInterval: "0.5s→1s→2s 指数（封顶 8s）",
-    offHint: "-1 = 一次都不重试，失败立刻上抛",
+    defInterval: "0.5с→1с→2с экспоненциально (максимум 8с)",
+    offHint: "-1 = не повторять ни разу, ошибка сразу передаётся наверх",
   },
   empty: {
-    title: "空响应重试",
-    where: "SDK · 仅 openai 格式",
+    title: "Повтор при пустом ответе",
+    where: "SDK · только для формата openai",
     trigger:
-      "HTTP 200、finish_reason 是正常 stop，但整条响应一个内容块都没有——网关空帧、思考字段丢帧、采样打嗝都会长这样。",
-    skips: "因 max_tokens 截断而没有内容的不算（那要靠调高输出上限解决，重发只会再撞一次）。",
-    desc: "重发整个 prompt，所以在长上下文上比较贵，次数不宜给大。",
-    attemptsLabel: "重试次数",
+      "HTTP 200, finish_reason — обычный stop, но во всём ответе нет ни одного блока содержимого — так выглядят пустые кадры шлюза, потерянные кадры поля мышления, сбои при сэмплировании.",
+    skips: "Не считается, если содержимого нет из-за обрезки по max_tokens (это решается увеличением лимита вывода, повтор просто наткнётся на то же самое).",
+    desc: "Повторно отправляет весь prompt целиком, поэтому на длинном контексте это дорого — не стоит задавать большое количество попыток.",
+    attemptsLabel: "Количество повторов",
     defAttempts: 2,
-    defInterval: "0.5s→1s→2s 指数（封顶 8s）",
-    offHint: "-1 = 空响应直接原样交出",
+    defInterval: "0.5с→1с→2с экспоненциально (максимум 8с)",
+    offHint: "-1 = пустой ответ отдаётся как есть, без повтора",
   },
   stream: {
-    title: "同 provider 安全窗口重试",
-    where: "本项目 · 未交付输出前",
+    title: "Повтор в защитном окне того же провайдера",
+    where: "этот проект · до того как вывод начал передаваться",
     trigger:
-      "流已经建立（拿到 200）之后才出问题：连接中途断开、供应商 overloaded、流内的 429 / 5xx 错误事件——且一个 token 都还没交给调用方。",
+      "Проблема возникает уже после установления потока (получен 200): разрыв соединения посередине, overloaded у провайдера, события ошибок 429 / 5xx внутри потока — и при этом вызывающей стороне ещё не передано ни одного токена.",
     skips:
-      "额度耗尽（402 / insufficient_quota，交给轮询换配置）、上下文过长（413 / context length，交给压缩）、400 / 401 / 403 / 404 / 422 确定性拒绝，都不重试。",
-    desc: "在同一个配置上重放同一个请求。因为还没交付任何输出，重放不会重复模型输出或工具执行。",
-    attemptsLabel: "重试次数",
+      "Не повторяется: исчерпание баланса (402 / insufficient_quota — передаётся ротации для смены конфигурации), слишком длинный контекст (413 / context length — передаётся сжатию), а также детерминированные отказы 400 / 401 / 403 / 404 / 422.",
+    desc: "Повторяет тот же запрос на той же конфигурации. Поскольку вывод ещё не был передан, повтор не приводит к дублированию ответа модели или выполнения инструментов.",
+    attemptsLabel: "Количество повторов",
     defAttempts: 2,
-    defInterval: "0.5s→1s 指数（封顶 4s）",
-    offHint: "-1 = 断流直接交给外层的意图重跑",
+    defInterval: "0.5с→1с экспоненциально (максимум 4с)",
+    offHint: "-1 = разрыв потока сразу передаётся внешнему слою — повторному запуску намерения",
   },
   breaker: {
-    title: "轮询熔断",
-    where: "本项目 · 进程级，全局一份",
+    title: "Автовыключатель ротации",
+    where: "этот проект · на уровне процесса, одна глобальная версия",
     trigger:
-      "瞬时失败（429、5xx、网络错误）连续累计到阈值时熔断；余额不足（402）、密钥失效（401 / 403）、模型不存在（404）这类确定性失败不看阈值，第一次就熔断。",
-    skips: "成功一次即清零，所以偶尔抽风的配置不会被慢慢攒到熔断。",
-    desc: "熔断后进入冷却，冷却期内轮询直接跳过这个配置。状态落库，重启不丢。",
-    attemptsLabel: "连续失败几次熔断",
+      "Срабатывает при накоплении временных сбоев (429, 5xx, сетевые ошибки) подряд до порога; детерминированные сбои — нехватка баланса (402), недействительный ключ (401 / 403), модель не найдена (404) — срабатывают с первого раза, без учёта порога.",
+    skips: "Один успешный вызов сбрасывает счётчик, поэтому изредка сбивающаяся конфигурация не накопит сбоев до срабатывания.",
+    desc: "После срабатывания конфигурация уходит в охлаждение, в период охлаждения ротация просто пропускает её. Состояние сохраняется в БД и не теряется при перезапуске.",
+    attemptsLabel: "После скольких сбоев подряд срабатывает",
     defAttempts: 3,
-    defInterval: "1min→5min→30min 梯度",
-    offHint: "-1 = 瞬时失败永不熔断（确定性失败仍然熔断）",
+    defInterval: "1мин→5мин→30мин по нарастающей",
+    offHint: "-1 = временные сбои никогда не вызывают срабатывание (детерминированные сбои всё равно его вызывают)",
   },
   intent: {
-    title: "意图重跑",
-    where: "本项目 · 进程级，全局一份",
+    title: "Повторный запуск намерения",
+    where: "этот проект · на уровне процесса, одна глобальная версия",
     trigger:
-      "前面几层都没兜住：worker 以 model_error 收场——内层重试全部用尽，或者流已经开始交付输出后才断掉（那时重放不安全，只能整条重来）。",
-    skips: "额度耗尽已经由轮询换配置处理，不在这里重跑；任务被暂停 / 终止 / 进入收尾时立即让位，不占用退避时间。",
-    desc: "整条意图从头再跑一遍。它是最外层，一次重跑意味着里面几层的次数会再乘一遍。",
-    attemptsLabel: "重跑次数",
+      "Предыдущие слои не справились: worker завершается с model_error — все внутренние повторы исчерпаны, либо разрыв произошёл уже после начала передачи вывода (в этом случае повтор небезопасен, можно только перезапустить всё целиком).",
+    skips: "Исчерпание баланса уже обрабатывается сменой конфигурации в ротации и здесь не перезапускается; при приостановке / завершении задачи или переходе к её закрытию уступает немедленно, не расходуя время отступа.",
+    desc: "Перезапускает всё намерение с начала. Это самый внешний слой, и один его перезапуск означает, что количества повторов внутренних слоёв умножаются ещё раз.",
+    attemptsLabel: "Количество перезапусков",
     defAttempts: 2,
-    defInterval: "固定 3s",
-    offHint: "-1 = 不重跑，该意图直接判为 blocked",
+    defInterval: "фиксировано 3с",
+    offHint: "-1 = без перезапуска, намерение сразу помечается как blocked",
   },
 } satisfies Record<string, LayerMeta>;
 
 type LayerKey = keyof typeof RETRY_LAYERS;
 
-/** 毫秒的人话，只用于在输入框旁边回显，免得数零。 */
+/** Человекочитаемое представление миллисекунд, используется только для отображения рядом с полем ввода, чтобы не считать нули. */
 function humanMs(ms: number) {
   if (!Number.isFinite(ms) || ms <= 0) return "";
   if (ms < 1000) return `${ms}ms`;
@@ -124,7 +128,7 @@ function humanMs(ms: number) {
   return `${Number((ms / 60_000).toFixed(2))}min`;
 }
 
-/** 受控数字输入：空串 ↔ 0，中间态（"-"、"1e"）原样留在本地，不打扰父级。 */
+/** Управляемое числовое поле: пустая строка ↔ 0, промежуточные состояния ("-", "1e") остаются локально как есть, не затрагивая родителя. */
 function NumField({
   id,
   value,
@@ -139,8 +143,9 @@ function NumField({
   min: number;
 }) {
   const [text, setText] = React.useState(value === 0 ? "" : String(value));
-  // 父级换了一整套值（读取到策略、切换配置）时跟上；自己敲字时不会走到这里，
-  // 因为那时 value 已经等于本地文本 parse 后的结果。
+  // Подхватывает, когда родитель заменяет весь набор значений (загружена политика, переключена
+  // конфигурация); при собственном наборе текста сюда не попадает, потому что в этот момент
+  // value уже равно результату парсинга локального текста.
   React.useEffect(() => {
     const incoming = value === 0 ? "" : String(value);
     setText((cur) => (Number(cur || 0) === value ? cur : incoming));
@@ -162,7 +167,7 @@ function NumField({
   );
 }
 
-/** 一层重试的两个旋钮。idPrefix 用来在同一页出现多次时保住 label 的 htmlFor。 */
+/** Два регулятора одного слоя повтора. idPrefix сохраняет htmlFor у label, когда компонент встречается на странице несколько раз. */
 export function RetryRuleFields({
   layer,
   idPrefix,
@@ -174,7 +179,7 @@ export function RetryRuleFields({
   idPrefix: string;
   value: LLMRetryRule;
   onChange: (r: LLMRetryRule) => void;
-  /** true = 配置抽屉里的紧凑版：省掉展开说明，只留「什么错误会走到这层」这一句 */
+  /** true = компактная версия для шторки конфигурации: без развёрнутых пояснений, только строка «какие ошибки попадают в этот слой» */
   compact?: boolean;
 }) {
   const meta = RETRY_LAYERS[layer];
@@ -186,13 +191,13 @@ export function RetryRuleFields({
           <Label className="text-sm">{meta.title}</Label>
           <span className="text-muted-foreground text-xs">{meta.where}</span>
         </div>
-        {/* 哪些错误会走到这层，具体到状态码——填了旋钮却看不到效果，多半是错误压根不落在这层。 */}
+        {/* Какие ошибки попадают в этот слой, вплоть до кода статуса — если настройка не даёт эффекта, скорее всего ошибка просто не относится к этому слою. */}
         <p className="text-muted-foreground text-xs">
-          <span className="font-medium text-foreground">触发</span>：{meta.trigger}
+          <span className="font-medium text-foreground">Срабатывает</span>: {meta.trigger}
         </p>
         {!compact && meta.skips && (
           <p className="text-muted-foreground text-xs">
-            <span className="font-medium text-foreground">不走这层</span>：{meta.skips}
+            <span className="font-medium text-foreground">Не относится к этому слою</span>: {meta.skips}
           </p>
         )}
         {!compact && <p className="text-muted-foreground text-xs">{meta.desc}</p>}
@@ -206,30 +211,30 @@ export function RetryRuleFields({
             id={`${idPrefix}-${layer}-n`}
             min={-1}
             value={value.attempts}
-            placeholder={`默认 ${meta.defAttempts}`}
+            placeholder={`По умолчанию ${meta.defAttempts}`}
             onChange={(n) => onChange({ ...value, attempts: n })}
           />
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor={`${idPrefix}-${layer}-ms`} className="text-muted-foreground text-xs">
-            间隔 ms
+            Интервал мс
           </Label>
           <NumField
             id={`${idPrefix}-${layer}-ms`}
             min={0}
             value={value.interval_ms}
-            placeholder="默认退避"
+            placeholder="По умолчанию backoff"
             onChange={(n) => onChange({ ...value, interval_ms: n })}
           />
-          <span className="text-muted-foreground text-xs">{human ? `固定 ${human}` : meta.defInterval}</span>
+          <span className="text-muted-foreground text-xs">{human ? `Фиксировано ${human}` : meta.defInterval}</span>
         </div>
       </div>
-      {!compact && <p className="text-muted-foreground text-xs">留空 = 用默认；{meta.offHint}。</p>}
+      {!compact && <p className="text-muted-foreground text-xs">Пусто = использовать значение по умолчанию; {meta.offHint}.</p>}
     </div>
   );
 }
 
-/** 模型配置抽屉里的三层覆盖（跟着端点走的那三层）。 */
+/** Три переопределяемых слоя в шторке конфигурации модели (те три, что привязаны к эндпоинту). */
 export function ProfileRetryFields({
   value,
   onChange,
@@ -240,10 +245,12 @@ export function ProfileRetryFields({
   return (
     <div className="grid gap-3 rounded-lg border p-3">
       <div className="grid gap-0.5">
-        <Label className="text-sm">重试覆盖</Label>
+        <Label className="text-sm">Переопределение повторов</Label>
         <p className="text-muted-foreground text-xs">
-          只对这个配置生效，覆盖「重试与退避」里的全局默认。每格留空 = 跟随全局；次数填 -1 = 关掉这层重试；
-          间隔填了就用固定间隔取代指数退避。熔断与意图重跑是进程级的，只能在全局那页调。
+          Действует только для этой конфигурации, переопределяя глобальные значения по умолчанию из вкладки
+          «Повторы и отступы». Пустое поле = следовать глобальным настройкам; -1 в количестве = выключить этот
+          слой повтора; заполненный интервал заменяет экспоненциальный backoff фиксированным. Автовыключатель и
+          повторный запуск намерения — на уровне процесса, настраиваются только на глобальной странице.
         </p>
       </div>
       {(["connect", "empty", "stream"] as const).map((k) => (
@@ -261,7 +268,7 @@ export function ProfileRetryFields({
   );
 }
 
-/** 「重试与退避」tab：五层的全局默认值。 */
+/** Вкладка «Повторы и отступы»: глобальные значения по умолчанию для пяти слоёв. */
 export function RetryPolicyPanel() {
   const [policy, setPolicy] = React.useState<LLMRetryPolicy>(ZERO_POLICY);
   const [loading, setLoading] = React.useState(true);
@@ -273,7 +280,7 @@ export function RetryPolicyPanel() {
       const p = await api.llmRetryPolicy();
       setPolicy({ ...ZERO_POLICY, ...p });
     } catch (e) {
-      toast.error(`读取重试策略失败：${(e as Error).message}`);
+      toast.error(`Ошибка загрузки политики повторов: ${(e as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -287,12 +294,13 @@ export function RetryPolicyPanel() {
     if (saving) return;
     setSaving(true);
     try {
-      // 后端会把越界值夹回区间并回传，直接用回传值刷新，所见即所存。
+      // Backend ограничивает выходящие за диапазон значения и возвращает их обратно;
+      // обновляем состояние возвращённым значением, что видно — то и сохранено.
       const saved = await api.saveLLMRetryPolicy(policy);
       setPolicy({ ...ZERO_POLICY, ...saved });
-      toast.success("已保存，即时生效（正在跑的这一轮调用仍用旧参数）");
+      toast.success("Сохранено, применяется сразу (текущий выполняющийся вызов всё ещё использует старые параметры)");
     } catch (e) {
-      toast.error(`保存失败：${(e as Error).message}`);
+      toast.error(`Ошибка сохранения: ${(e as Error).message}`);
     } finally {
       setSaving(false);
     }
@@ -303,7 +311,7 @@ export function RetryPolicyPanel() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-dashed p-10 text-muted-foreground text-sm">
-        <Loader2Icon className="size-4 animate-spin" /> 读取重试策略…
+        <Loader2Icon className="size-4 animate-spin" /> Загрузка политики повторов…
       </div>
     );
   }
@@ -311,12 +319,17 @@ export function RetryPolicyPanel() {
   return (
     <div className="grid gap-4">
       <div className="rounded-lg border bg-muted/30 p-3 text-muted-foreground text-xs leading-relaxed">
-        一次模型调用的失败会依次经过五层重试，由内到外：
-        <span className="text-foreground"> 建连 → 空响应 → 同 provider 安全窗口 → 轮询熔断 → 意图重跑</span>
-        。内层用尽才轮到外层，所以次数是
-        <span className="text-foreground">相乘</span>
-        的——把每层都拉满，一次抖动能烧掉几十次请求。
-        全部留空即当前默认值，与没有这页时的行为完全一致。前三层可以在每个模型配置里单独覆盖。
+        Сбой одного вызова модели последовательно проходит через пять слоёв повтора, от внутреннего к внешнему:
+        <span className="text-foreground">
+          {" "}
+          установка соединения → пустой ответ → защитное окно того же провайдера → автовыключатель ротации →
+          повторный запуск намерения
+        </span>
+        . Внешний слой включается только когда исчерпан внутренний, поэтому количества{" "}
+        <span className="text-foreground">перемножаются</span> — если выставить максимум на каждом слое, один
+        сбой может сжечь десятки запросов. Если всё оставить пустым — это текущие значения по умолчанию,
+        поведение полностью совпадает с тем, что было без этой страницы. Первые три слоя можно переопределить
+        индивидуально в каждой конфигурации модели.
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -328,10 +341,10 @@ export function RetryPolicyPanel() {
       <div className="flex gap-2">
         <Button onClick={save} disabled={saving}>
           {saving ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
-          保存
+          Сохранить
         </Button>
         <Button variant="outline" onClick={() => setPolicy(ZERO_POLICY)} disabled={saving}>
-          全部恢复默认
+          Сбросить всё к значениям по умолчанию
         </Button>
       </div>
     </div>
