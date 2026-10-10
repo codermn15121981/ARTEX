@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ARTEX 安装脚本：① 全部 Docker  ② 本地编译运行
+# Скрипт установки ARTEX: ① полностью в Docker  ② локальная компиляция и запуск
 set -euo pipefail
 cd "$(cd "$(dirname "$0")" && pwd)"
 
@@ -10,71 +10,97 @@ die(){  printf '\033[31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 ask(){  local p="$1" d="${2:-}" a; read -rp "$p${d:+ [$d]}: " a; echo "${a:-$d}"; }
 rand(){ head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24; }
 
-# ── docker 环境检测 / 自动安装 ───────────────────
+# ── обнаружение / автоустановка docker ───────────────────
 ensure_docker(){
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    ok "已检测到 docker 与 docker compose"; return
+    ok "docker и docker compose обнаружены"; return
   fi
-  warn "未检测到 docker / docker compose"
+  warn "docker / docker compose не обнаружены"
   case "$(uname -s)" in
     Linux)
-      if [ "$(ask '自动安装 Docker? (y/n)' y)" = y ]; then
+      if [ "$(ask 'Установить Docker автоматически? (y/n)' y)" = y ]; then
         curl -fsSL https://get.docker.com | sh
         sudo usermod -aG docker "$USER" || true
-        ok "Docker 安装完成（用户组变更需重新登录后免 sudo）"
+        ok "Docker установлен (для работы без sudo нужно перелогиниться — изменение группы вступит в силу)"
       else
-        die "请自行安装 docker 后重试"
+        die "Установите docker самостоятельно и повторите попытку"
       fi ;;
-    Darwin) die "macOS 请安装 Docker Desktop：https://www.docker.com/products/docker-desktop/" ;;
-    *)      die "请自行安装 docker 后重试" ;;
+    Darwin) die "На macOS установите Docker Desktop: https://www.docker.com/products/docker-desktop/" ;;
+    *)      die "Установите docker самостоятельно и повторите попытку" ;;
   esac
 }
 
-# ── ① 全部 Docker ───────────────────────────────
+# ── определение архитектуры для dist/<arch>/artex, который ожидает Dockerfile ──
+docker_target_arch(){
+  case "$(uname -m)" in
+    x86_64|amd64) echo amd64 ;;
+    aarch64|arm64) echo arm64 ;;
+    *) die "Неподдерживаемая архитектура для Docker-сборки: $(uname -m)" ;;
+  esac
+}
+
+# Этот форк (перевод интерфейса на русский) не публикует готовый образ в Docker
+# Hub — вместо того, чтобы скачать оригинальный (непереведённый) образ автора
+# проекта, собираем бинарник и образ локально из исходного кода этого форка.
+build_docker_binary(){
+  command -v npm >/dev/null 2>&1 || die "npm не найден (нужен для сборки фронтенда)"
+  command -v go  >/dev/null 2>&1 || die "Go не найден (нужна версия >=1.26): https://go.dev/dl/"
+  local arch; arch="$(docker_target_arch)"
+  info "Сборка статических файлов фронтенда…"
+  ( cd web && npm ci && npm run build:static )
+  rm -rf server/webui/dist && cp -r web/out server/webui/dist
+  info "Компиляция бинарника для linux/${arch}…"
+  mkdir -p "dist/${arch}"
+  CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" go build -tags embedui -trimpath -o "dist/${arch}/artex" ./cmd/artex
+  ok "Бинарник собран → dist/${arch}/artex"
+}
+
+# ── ① полностью в Docker ───────────────────────────────
 install_docker(){
   ensure_docker
   if [ ! -f .env ]; then
     cp .env.example .env 2>/dev/null || true
     local pw key
-    pw="$(ask 'Postgres 密码（回车随机生成）' "$(rand)")"
-    key="$(ask 'ANTHROPIC_API_KEY（可留空，后续在 UI 配）' '')"
+    pw="$(ask 'Пароль Postgres (Enter — сгенерировать случайный)' "$(rand)")"
+    key="$(ask 'ANTHROPIC_API_KEY (можно оставить пустым и задать позже в UI)' '')"
     sed -i.bak "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${pw}|" .env
     sed -i.bak "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${key}|" .env
     rm -f .env.bak
-    ok "已生成 .env（POSTGRES_PASSWORD 已设置）"
+    ok ".env создан (POSTGRES_PASSWORD установлен)"
   else
-    info "沿用已存在的 .env"
+    info "Используется уже существующий .env"
   fi
-  info "拉取镜像并启动…"
-  docker compose pull || true
+  build_docker_binary
+  info "Сборка образа и запуск…"
+  docker compose build artex
   docker compose up -d
-  ok "启动完成 → http://localhost:8787"
-  info "查看日志：docker compose logs -f artex"
+  ok "Запуск завершён → http://localhost:8787"
+  info "Логи: docker compose logs -f artex"
 }
 
-# ── ② 本地编译运行 ──────────────────────────────
+# ── ② локальная компиляция и запуск ──────────────────────────────
 install_local(){
-  echo "数据库安装方式："
-  echo "  1) 连接已有 PostgreSQL"
-  echo "  2) 用 Docker 起一个 PostgreSQL（需要 docker）"
-  case "$(ask '选择' 1)" in
+  echo "Способ установки базы данных:"
+  echo "  1) Подключиться к существующему PostgreSQL"
+  echo "  2) Поднять PostgreSQL через Docker (нужен docker)"
+  case "$(ask 'Выбор' 1)" in
     2)
       ensure_docker
-      local pw; pw="$(ask 'Postgres 密码（回车随机）' "$(rand)")"
+      local pw; pw="$(ask 'Пароль Postgres (Enter — случайный)' "$(rand)")"
       docker run -d --name artex-pg -p 5432:5432 \
         -e POSTGRES_USER=artex -e POSTGRES_PASSWORD="$pw" -e POSTGRES_DB=artex \
         -v artex-pg:/var/lib/postgresql/data postgres:16-alpine
       DB_HOST=127.0.0.1 DB_PORT=5432 DB_USER=artex DB_PASS="$pw" DB_NAME=artex DB_SSL=disable ;;
     *)
-      DB_HOST="$(ask '数据库地址' 127.0.0.1)"
-      DB_PORT="$(ask '端口' 5432)"
-      DB_USER="$(ask '账号' artex)"
-      DB_PASS="$(ask '密码' '')"
-      DB_NAME="$(ask '数据库名' artex)"
+      DB_HOST="$(ask 'Адрес базы данных' 127.0.0.1)"
+      DB_PORT="$(ask 'Порт' 5432)"
+      DB_USER="$(ask 'Пользователь' artex)"
+      DB_PASS="$(ask 'Пароль' '')"
+      DB_NAME="$(ask 'Имя базы данных' artex)"
       DB_SSL="$(ask 'sslmode (disable/require)' disable)" ;;
   esac
 
-  # 生成 config.json
+  # генерация config.json
   cat > config.json <<JSON
 {
   "database": {
@@ -87,36 +113,36 @@ install_local(){
   }
 }
 JSON
-  ok "已生成 config.json"
+  ok "config.json создан"
 
-  # go 环境检查
-  command -v go >/dev/null 2>&1 || die "未检测到 Go，请先安装 Go（>=1.26）：https://go.dev/dl/"
+  # проверка Go
+  command -v go >/dev/null 2>&1 || die "Go не найден, установите Go (>=1.26): https://go.dev/dl/"
   ok "Go: $(go version)"
 
-  # 内嵌前端需要 node 出静态产物
+  # для встроенного фронтенда нужен node для статической сборки
   if command -v npm >/dev/null 2>&1; then
-    info "构建前端静态产物…"
+    info "Сборка статических файлов фронтенда…"
     ( cd web && npm ci && npm run build:static )
     rm -rf server/webui/dist && cp -r web/out server/webui/dist
-    info "编译内嵌单二进制…"
+    info "Компиляция единого бинарника со встроенным фронтендом…"
     CGO_ENABLED=0 go build -tags embedui -trimpath -o artex ./cmd/artex
   else
-    warn "未检测到 npm：将编译**不内嵌前端**的后端（前端需另跑 npm run dev）"
+    warn "npm не найден: будет собран бэкенд **без встроенного фронтенда** (фронтенд нужно запускать отдельно через npm run dev)"
     CGO_ENABLED=0 go build -o artex ./cmd/artex
   fi
-  ok "编译完成 → ./artex"
+  ok "Сборка завершена → ./artex"
 
-  info "启动…（Ctrl-C 退出）"
+  info "Запуск… (Ctrl-C для выхода)"
   ./artex
 }
 
 echo "=============================="
-echo "  ARTEX 安装"
-echo "  1) 全部 Docker 安装"
-echo "  2) 本地运行（go 编译）"
+echo "  Установка ARTEX"
+echo "  1) Полностью в Docker"
+echo "  2) Локальный запуск (сборка через go)"
 echo "=============================="
-case "$(ask '选择' 1)" in
+case "$(ask 'Выбор' 1)" in
   1) install_docker ;;
   2) install_local ;;
-  *) die "无效选择" ;;
+  *) die "Неверный выбор" ;;
 esac
