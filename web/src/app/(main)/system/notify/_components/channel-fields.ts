@@ -1,26 +1,31 @@
-// 渠道字段表与配置值的解析工具。
+// Таблица полей каналов и утилиты разбора значений конфигурации.
 //
-// 与页面拆开是因为这一份是**数据**而不是视图：它描述每种渠道有哪些字段、
-// 各自该用什么控件，以及表单文本到配置值（JSON）的双向转换。
-// 单独放一个文件后，新增渠道只需要动这里，页面本身不必改。
-// 渠道类型的展示名与简介。放在前端是因为它只影响文案，后端不需要知道。
+// Вынесено из страницы в отдельный файл, потому что это **данные**, а не представление:
+// здесь описано, какие поля есть у каждого канала, какой контрол использовать для
+// каждого, и как текст формы превращается в значение конфигурации (JSON) и обратно.
+// Благодаря отдельному файлу добавление нового канала требует правок только здесь,
+// саму страницу менять не нужно.
+// Отображаемое имя и описание типа канала. Находится на фронтенде, потому что влияет
+// только на текст, backend об этом знать не нужно.
 export const KIND_LABEL: Record<string, string> = {
-  dingtalk: "钉钉",
-  feishu: "飞书",
-  wecom: "企业微信",
-  webhook: "通用 Webhook",
+  dingtalk: "DingTalk",
+  feishu: "Feishu (Lark)",
+  wecom: "WeCom (WeChat Work)",
+  webhook: "Обычный Webhook",
   telegram: "Telegram",
-  email: "邮件",
+  email: "Email",
 };
 
-// 各渠道的配置字段定义。
+// Определения полей конфигурации для каждого канала.
 //
-// 这里刻意保留一份前端字段表，而不是让后端下发 schema：后端只负责
-// Validate（必填/格式），UI 需要的是布局与控件类型，两者关注的不是同一件事。
-// 唯一的耦合点是 secret_keys —— 哪些字段该渲染成密码框由后端给出，
-// 因为只有渠道实现自己清楚哪些值算凭据（企业微信的整个 Webhook 就是凭据，
-// 而钉钉的只是其中一个 secret）。新增渠道时这里少一个条目只会让表单变空白，
-// 不会静默出错（下面的 hasFields 会提示）。
+// Здесь намеренно хранится отдельная таблица полей на фронтенде, а не схема, отдаваемая
+// backend'ом: backend отвечает только за Validate (обязательность/формат), а UI нужна
+// раскладка и тип контрола — это разные задачи. Единственная точка связи — secret_keys:
+// какие поля рендерить как поле пароля определяет backend, потому что только сама
+// реализация канала знает, какие значения являются учётными данными (у WeCom вообще
+// весь Webhook — это учётные данные, а у DingTalk — лишь один из secret-параметров).
+// Если при добавлении канала здесь не хватает записи, форма просто окажется пустой,
+// без молчаливой ошибки (на это укажет hasFields ниже).
 export type FieldKind = "text" | "password" | "number" | "select" | "textarea" | "switch" | "kv" | "list";
 export interface FieldDef {
   key: string;
@@ -34,56 +39,56 @@ export const CHANNEL_FIELDS: Record<string, FieldDef[]> = {
   dingtalk: [
     {
       key: "webhook",
-      label: "Webhook 地址",
+      label: "Адрес Webhook",
       kind: "text",
       placeholder: "https://oapi.dingtalk.com/robot/send?access_token=...",
     },
     {
       key: "secret",
-      label: "加签密钥",
+      label: "Ключ подписи",
       kind: "password",
-      help: "机器人安全设置选「加签」时填写；选「自定义关键词」或未开启安全设置则留空",
+      help: "Заполните, если в настройках безопасности бота выбрано «подпись»; если выбрано «ключевые слова» или безопасность не настроена — оставьте пустым",
     },
   ],
   feishu: [
     {
       key: "webhook",
-      label: "Webhook 地址",
+      label: "Адрес Webhook",
       kind: "text",
       placeholder: "https://open.feishu.cn/open-apis/bot/v2/hook/...",
     },
-    { key: "secret", label: "签名校验密钥", kind: "password", help: "机器人开启「签名校验」时填写，否则留空" },
+    { key: "secret", label: "Ключ проверки подписи", kind: "password", help: "Заполните, если у бота включена «проверка подписи», иначе оставьте пустым" },
   ],
   wecom: [
     {
       key: "webhook",
-      label: "Webhook 地址",
+      label: "Адрес Webhook",
       kind: "text",
       placeholder: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...",
     },
   ],
   webhook: [
-    { key: "url", label: "目标 URL", kind: "text", placeholder: "https://your-endpoint.example.com/hook" },
+    { key: "url", label: "Целевой URL", kind: "text", placeholder: "https://your-endpoint.example.com/hook" },
     {
       key: "method",
-      label: "请求方法",
+      label: "Метод запроса",
       kind: "select",
       options: [
-        { value: "POST", label: "POST（带请求体）" },
-        { value: "PUT", label: "PUT（带请求体）" },
-        { value: "PATCH", label: "PATCH（带请求体）" },
-        { value: "GET", label: "GET（不带请求体）" },
+        { value: "POST", label: "POST (с телом запроса)" },
+        { value: "PUT", label: "PUT (с телом запроса)" },
+        { value: "PATCH", label: "PATCH (с телом запроса)" },
+        { value: "GET", label: "GET (без тела запроса)" },
       ],
     },
-    { key: "headers", label: "自定义请求头", kind: "kv", help: "每行 KEY=VALUE，例如 Authorization=Bearer xxx" },
+    { key: "headers", label: "Пользовательские заголовки", kind: "kv", help: "По одному KEY=VALUE на строку, например Authorization=Bearer xxx" },
     {
       key: "body_template",
-      label: "请求体模板",
+      label: "Шаблон тела запроса",
       kind: "textarea",
       help:
-        "留空用内置默认模板。变量：{{.Title}} {{.Batch}} {{.Count}} {{.HomeURL}} {{.SentAt}}，" +
-        "以及 range .Items 下的 .Name/.VulnClass/.Severity/.Summary/.Assets/.DetailURL/.StatusLabel。" +
-        "插入字符串请用 {{json .Xxx}} 而不是 {{.Xxx}}，否则标题里的引号会破坏 JSON。",
+        "Оставьте пустым, чтобы использовать встроенный шаблон по умолчанию. Переменные: {{.Title}} {{.Batch}} {{.Count}} {{.HomeURL}} {{.SentAt}}, " +
+        "а также .Name/.VulnClass/.Severity/.Summary/.Assets/.DetailURL/.StatusLabel внутри range .Items. " +
+        "Для вставки строк используйте {{json .Xxx}}, а не {{.Xxx}} — иначе кавычки в заголовке сломают JSON.",
     },
   ],
   telegram: [
@@ -91,35 +96,35 @@ export const CHANNEL_FIELDS: Record<string, FieldDef[]> = {
     { key: "chat_id", label: "Chat ID", kind: "text", placeholder: "-1001234567890" },
     {
       key: "base_url",
-      label: "API 地址",
+      label: "Адрес API",
       kind: "text",
       placeholder: "https://api.telegram.org",
-      help: "留空用官方地址；自建 Bot API 反代时填写",
+      help: "Оставьте пустым для официального адреса; заполните при использовании собственного реверс-прокси Bot API",
     },
   ],
   email: [
-    { key: "host", label: "SMTP 服务器", kind: "text", placeholder: "smtp.example.com" },
+    { key: "host", label: "SMTP-сервер", kind: "text", placeholder: "smtp.example.com" },
     {
       key: "port",
-      label: "端口",
+      label: "Порт",
       kind: "number",
       placeholder: "587",
-      help: "587 走 STARTTLS；465 请把「隐式 TLS」打开",
+      help: "587 — через STARTTLS; для 465 включите «неявный TLS»",
     },
-    { key: "username", label: "账号", kind: "text" },
-    { key: "password", label: "密码 / 授权码", kind: "password" },
-    { key: "from", label: "发件人", kind: "text", placeholder: "artex@example.com" },
-    { key: "to", label: "收件人", kind: "list", help: "多个地址用逗号分隔" },
-    { key: "tls", label: "隐式 TLS", kind: "switch", help: "465 端口打开；587 保持关闭（会自动 STARTTLS）" },
+    { key: "username", label: "Логин", kind: "text" },
+    { key: "password", label: "Пароль / код авторизации", kind: "password" },
+    { key: "from", label: "Отправитель", kind: "text", placeholder: "artex@example.com" },
+    { key: "to", label: "Получатели", kind: "list", help: "Несколько адресов через запятую" },
+    { key: "tls", label: "Неявный TLS", kind: "switch", help: "Включите для порта 465; для 587 оставьте выключенным (STARTTLS включится автоматически)" },
   ],
 };
 
 export const SEVERITY_OPTIONS = [
-  { value: "", label: "不限" },
-  { value: "low", label: "低危及以上" },
-  { value: "medium", label: "中危及以上" },
-  { value: "high", label: "高危及以上" },
-  { value: "critical", label: "仅严重" },
+  { value: "", label: "Без ограничений" },
+  { value: "low", label: "Низкая и выше" },
+  { value: "medium", label: "Средняя и выше" },
+  { value: "high", label: "Высокая и выше" },
+  { value: "critical", label: "Только критическая" },
 ];
 
 export type ChannelForm = {
@@ -152,7 +157,7 @@ export const emptyForm = (kind: string): ChannelForm => ({
   onStatusChange: false,
 });
 
-// parseKV 解析「每行 KEY=VALUE」的文本域。
+// parseKV разбирает текстовое поле вида «по одной паре KEY=VALUE на строку».
 export function parseKV(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of text.split("\n")) {
@@ -163,7 +168,7 @@ export function parseKV(text: string): Record<string, string> {
   }
   return out;
 }
-// parseIDs 解析逗号/空白分隔的 id 列表。
+// parseIDs разбирает список id, разделённый запятыми/пробелами.
 export function parseIDs(text: string): number[] {
   return text
     .split(/[\s,，]+/)
@@ -172,7 +177,7 @@ export function parseIDs(text: string): number[] {
     .map((s) => Number(s))
     .filter((n) => Number.isFinite(n) && n > 0);
 }
-// parseKeywords 解析行/逗号分隔的关键词列表（漏洞类型名可能含空格，所以按行或逗号切）。
+// parseKeywords разбирает список ключевых слов, разделённых строками/запятыми (название типа уязвимости может содержать пробелы, поэтому разделитель — строка или запятая).
 export function parseKeywords(text: string): string[] {
   return text
     .split(/[\n,，]+/)
