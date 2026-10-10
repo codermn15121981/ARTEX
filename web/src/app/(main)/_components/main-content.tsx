@@ -16,7 +16,7 @@ import { SearchDialog } from "./sidebar/search-dialog";
 import { ThemeSwitcher } from "./sidebar/theme-switcher";
 import { UpdateBadge } from "./update-badge";
 
-// 任务详情页保持原样：它自带头部/Tabs 与内边距，这里不再叠加全局头部和 padding。
+// Страница деталей задачи оставлена без изменений: у неё свой заголовок/Tabs и внутренние отступы, здесь глобальный заголовок и padding не накладываются.
 function isFullBleed(pathname: string) {
   const p = (() => {
     try {
@@ -25,8 +25,9 @@ function isFullBleed(pathname: string) {
       return pathname;
     }
   })();
-  // 静态导出开了 trailingSlash，列表页自身的 pathname 是 "/function/tasks/"，
-  // 先去掉尾斜杠再判前缀，否则列表页会被误判成详情页而丢掉全局头部。
+  // При статическом экспорте включён trailingSlash, у самой страницы списка pathname
+  // равен "/function/tasks/"; сначала убираем конечный слеш, затем проверяем префикс —
+  // иначе страница списка будет ошибочно принята за страницу деталей и потеряет глобальный заголовок.
   const normalized = p.replace(/\/+$/, "");
   return normalized.startsWith("/function/tasks/");
 }
@@ -66,7 +67,7 @@ export function MainContent({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             {version && (
-              <span className="font-medium text-muted-foreground text-xs tabular-nums">版本 · {version}</span>
+              <span className="font-medium text-muted-foreground text-xs tabular-nums">Версия · {version}</span>
             )}
             <UpdateBadge />
             <LayoutControls />
