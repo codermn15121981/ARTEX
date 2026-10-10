@@ -55,10 +55,10 @@ function AgentGridCard({
   async function del() {
     try {
       await api.deleteAgent(agent.key);
-      toast.success(`已删除 Agent「${agent.name}」`);
+      toast.success(`Agent «${agent.name}» удалён`);
       onDeleted();
     } catch (e) {
-      toast.error("删除失败：" + (e as Error).message);
+      toast.error("Ошибка удаления: " + (e as Error).message);
     }
   }
   return (
@@ -70,26 +70,26 @@ function AgentGridCard({
           <span className="text-muted-foreground font-mono text-xs">{agent.key}</span>
           {agent.builtin ? (
             <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-              内置
+              Встроенный
             </Badge>
           ) : (
             <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-              自定义
+              Пользовательский
             </Badge>
           )}
           {!agent.enabled && (
             <Badge variant="outline" className="text-destructive px-1.5 py-0 text-[10px]">
-              已停用
+              Выключен
             </Badge>
           )}
         </div>
         <p className="text-muted-foreground line-clamp-2 min-h-8 text-xs">
-          {agent.description || "（无描述）"}
+          {agent.description || "(нет описания)"}
         </p>
         <div className="text-muted-foreground flex flex-wrap gap-1.5 text-[10px]">
           <span className="rounded border px-1.5 py-0.5">MCP {agent.mcp_count ?? 0}</span>
           <span className="rounded border px-1.5 py-0.5">Skill {agent.skill_count ?? 0}</span>
-          <span className="rounded border px-1.5 py-0.5">工具 {agent.tool_count ?? 0}</span>
+          <span className="rounded border px-1.5 py-0.5">Инструменты {agent.tool_count ?? 0}</span>
         </div>
       </button>
       {!agent.builtin && (
@@ -105,14 +105,14 @@ function AgentGridCard({
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>删除 Agent「{agent.name}」？</AlertDialogTitle>
+              <AlertDialogTitle>Удалить Agent «{agent.name}»?</AlertDialogTitle>
               <AlertDialogDescription>
-                将一并删除它的提示词、变量、可见性与工具绑定。此操作不可撤销。
+                Будут также удалены его промпт, переменные, видимость и привязки инструментов. Это действие нельзя отменить.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>取消</AlertDialogCancel>
-              <AlertDialogAction onClick={del}>删除</AlertDialogAction>
+              <AlertDialogCancel>Отмена</AlertDialogCancel>
+              <AlertDialogAction onClick={del}>Удалить</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -132,14 +132,14 @@ function CreateAgentDialog({ onCreated }: { onCreated: (key: string) => void }) 
     setBusy(true);
     try {
       const a = await api.createAgent(key.trim(), name.trim(), description.trim());
-      toast.success(`已创建 Agent「${a.name}」`);
+      toast.success(`Agent «${a.name}» создан`);
       setOpen(false);
       setKey("");
       setName("");
       setDescription("");
       onCreated(a.key);
     } catch (e) {
-      toast.error("创建失败：" + (e as Error).message);
+      toast.error("Ошибка создания: " + (e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -152,14 +152,15 @@ function CreateAgentDialog({ onCreated }: { onCreated: (key: string) => void }) 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <PlusIcon /> 新建 Agent
+          <PlusIcon /> Новый Agent
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>新建自定义 Agent</DialogTitle>
+          <DialogTitle>Новый пользовательский Agent</DialogTitle>
           <DialogDescription>
-            创建一个会话型助手。key 用于内部标识，创建后不可更改；名称与描述用于识别。
+            Создание диалогового помощника. key используется для внутренней идентификации и не может быть
+            изменён после создания; название и описание — для идентификации.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
@@ -167,29 +168,29 @@ function CreateAgentDialog({ onCreated }: { onCreated: (key: string) => void }) 
             <Label htmlFor="agent-key">Key</Label>
             <Input
               id="agent-key"
-              placeholder="如 research_helper"
+              placeholder="например, research_helper"
               value={key}
               onChange={(e) => setKey(e.target.value)}
               className="font-mono"
             />
             {key.length > 0 && !keyOk && (
-              <span className="text-destructive text-xs">小写字母开头，仅含小写字母/数字/下划线</span>
+              <span className="text-destructive text-xs">Должен начинаться со строчной буквы, содержать только строчные буквы/цифры/подчёркивания</span>
             )}
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="agent-name">名称</Label>
+            <Label htmlFor="agent-name">Название</Label>
             <Input
               id="agent-name"
-              placeholder="如 研究助手"
+              placeholder="например, Помощник по исследованиям"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="agent-desc">描述</Label>
+            <Label htmlFor="agent-desc">Описание</Label>
             <Textarea
               id="agent-desc"
-              placeholder="一句话说明这个 Agent 是干什么的"
+              placeholder="Одно предложение о назначении этого Agent"
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -198,7 +199,7 @@ function CreateAgentDialog({ onCreated }: { onCreated: (key: string) => void }) 
         </div>
         <DialogFooter>
           <Button onClick={create} disabled={!canCreate}>
-            创建
+            Создать
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -225,7 +226,7 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Agent</h1>
           <p className="text-muted-foreground text-sm">
-            内置 Agent 的提示词/配置，以及自定义会话 Agent 的创建与管理
+            Промпты/конфигурация встроенных Agent, а также создание и управление пользовательскими диалоговыми Agent
           </p>
         </div>
         <CreateAgentDialog
@@ -238,12 +239,12 @@ export default function AgentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Agent 清单</CardTitle>
-          <CardDescription>共 {agents.length} 个</CardDescription>
+          <CardTitle>Список Agent</CardTitle>
+          <CardDescription>Всего {agents.length}</CardDescription>
         </CardHeader>
         <CardContent>
           {agents.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-center text-sm">（暂无 Agent）</p>
+            <p className="text-muted-foreground py-6 text-center text-sm">(нет агентов)</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {agents.map((a) => (
@@ -267,11 +268,11 @@ export default function AgentsPage() {
                   <span className="text-muted-foreground font-mono text-xs">{editing.key}</span>
                   {!editing.builtin && (
                     <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                      自定义
+                      Пользовательский
                     </Badge>
                   )}
                 </SheetTitle>
-                <SheetDescription>{editing.description || "提示词、配置、可见资源与工具绑定"}</SheetDescription>
+                <SheetDescription>{editing.description || "Промпт, конфигурация, видимые ресурсы и привязки инструментов"}</SheetDescription>
               </SheetHeader>
               <AgentEditor agentKey={editing.key} onSaved={reload} />
             </>

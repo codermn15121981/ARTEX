@@ -28,12 +28,12 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Agent, AgentDetail, AgentTrigger, MCPServer, PromptVar, PromptVersion, Settings, SkillItem, Tool } from "@/lib/types";
 
-// Traffic tools are host tools gated by the global 流量捕获 switch: bindable, but
+// Traffic tools are host tools gated by the global traffic-capture switch: bindable, but
 // only usable when capture is on. Keep this list in sync with traffic.SeedToolMetas.
 const TRAFFIC_TOOL_KEYS = new Set(["traffic_search", "traffic_get"]);
 
 // AgentEditor is the tabbed editor for one agent, used inside the agents-page
-// drawer (and reused full-page for deep links). Tabs: 配置与提示词 / MCP / Skill /
+// drawer (and reused full-page for deep links). Tabs: config & prompt / MCP / Skill /
 // Tools. Config + prompt save as before; visibility + tool bindings toggle live.
 export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?: () => void }) {
   const [detail, setDetail] = React.useState<AgentDetail | null>(null);
@@ -52,7 +52,7 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
   const [preview, setPreview] = React.useState("");
   const [maxTurns, setMaxTurns] = React.useState("0");
   const [runSecs, setRunSecs] = React.useState("600");
-  // "" = 跟随(未绑定)；否则为 profile id 字符串
+  // "" = следовать (не привязано); иначе строка с id profile
   const [llmProfileId, setLlmProfileId] = React.useState("");
   const [llmProfiles, setLlmProfiles] = React.useState<NonNullable<AgentDetail["llm_profiles"]>>([]);
   const [webSearch, setWebSearch] = React.useState(false);
@@ -61,7 +61,7 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
   const [wrapupDefault, setWrapupDefault] = React.useState("");
   const [wrapupTurns, setWrapupTurns] = React.useState("0");
   const [wrapupTurnsDefault, setWrapupTurnsDefault] = React.useState(5);
-  // 任务级超时收尾词(仅 worker/planner)
+  // Слово завершения при таймауте на уровне задачи (только worker/planner)
   const [ttSupported, setTtSupported] = React.useState(false);
   const [ttWrapup, setTtWrapup] = React.useState("");
   const [ttWrapupDefault, setTtWrapupDefault] = React.useState("");
@@ -75,7 +75,7 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
     api.tools().then(setTools).catch(() => {});
     api.settings().then(setSettings).catch(() => {});
   }, []);
-  // global gates: traffic tools need 流量捕获, web search needs the master switch.
+  // global gates: traffic tools need traffic capture, web search needs the master switch.
   const captureOn = !!settings?.traffic_capture;
   const webSearchGlobalOn = !!settings?.web_search_enabled;
 
@@ -115,71 +115,72 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
   async function doPreview() {
     try {
       const r = await api.previewAgentPrompt(agentKey, prompt);
-      setPreview(r.error ? "渲染错误：" + r.error : r.rendered);
+      setPreview(r.error ? "Ошибка рендеринга: " + r.error : r.rendered);
     } catch (e) {
-      setPreview("预览失败：" + (e as Error).message);
+      setPreview("Ошибка предпросмотра: " + (e as Error).message);
     }
   }
   async function savePrompt() {
     try {
       const r = await api.saveAgentPrompt(agentKey, prompt);
-      toast.success(`已保存为版本 v${r.version}`);
+      toast.success(`Сохранено как версия v${r.version}`);
       reload();
       onSaved?.();
     } catch (e) {
-      toast.error("保存失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения: " + (e as Error).message);
     }
   }
   async function resetPrompt() {
     try {
       const r = await api.resetAgentPrompt(agentKey);
-      toast.success(`已恢复为内置默认（v${r.version}）`);
+      toast.success(`Восстановлено значение по умолчанию (v${r.version})`);
       reload();
     } catch (e) {
-      toast.error("恢复失败：" + (e as Error).message);
+      toast.error("Ошибка восстановления: " + (e as Error).message);
     }
   }
   async function saveWrapup() {
     try {
       const turns = Math.max(0, Math.floor(Number(wrapupTurns) || 0));
       await api.saveAgentWrapup(agentKey, wrapup, turns);
-      toast.success(wrapup.trim() || turns > 0 ? "收尾配置已保存（下次运行生效）" : "已清空，将使用内置默认");
+      toast.success(wrapup.trim() || turns > 0 ? "Конфигурация завершения сохранена (применяется со следующего запуска)" : "Очищено, будет использоваться встроенное значение по умолчанию");
       reload();
     } catch (e) {
-      toast.error("保存失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения: " + (e as Error).message);
     }
   }
   async function resetWrapup() {
     try {
       await api.resetAgentWrapup(agentKey);
-      toast.success("已恢复为内置默认");
+      toast.success("Восстановлено значение по умолчанию");
       reload();
     } catch (e) {
-      toast.error("恢复失败：" + (e as Error).message);
+      toast.error("Ошибка восстановления: " + (e as Error).message);
     }
   }
   async function saveTaskTimeoutWrapup() {
     try {
       const turns = Math.max(0, Math.floor(Number(ttTurns) || 0));
       await api.saveAgentTaskTimeoutWrapup(agentKey, ttWrapup, turns);
-      toast.success("任务超时收尾配置已保存（下次运行生效）");
+      toast.success("Конфигурация завершения при таймауте задачи сохранена (применяется со следующего запуска)");
       reload();
     } catch (e) {
-      toast.error("保存失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения: " + (e as Error).message);
     }
   }
   async function resetTaskTimeoutWrapup() {
     try {
       await api.resetAgentTaskTimeoutWrapup(agentKey);
-      toast.success("已恢复为内置默认");
+      toast.success("Восстановлено значение по умолчанию");
       reload();
     } catch (e) {
-      toast.error("恢复失败：" + (e as Error).message);
+      toast.error("Ошибка восстановления: " + (e as Error).message);
     }
   }
   async function saveConfig() {
     try {
-      // 只提交本 agent 实际展示的字段，避免把未显示项(如 goals 的 max_turns)覆盖成默认。
+      // Отправляем только те поля, которые реально отображаются для данного agent, чтобы не
+      // перезаписать значениями по умолчанию скрытые параметры (например, max_turns у goals).
       const patch: Parameters<typeof api.saveAgentConfig>[1] = {
         llm_profile_id: llmProfileId === "" ? null : Number(llmProfileId),
       };
@@ -190,10 +191,10 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
       if (showWebSearch) patch.web_search = webSearch;
       if (showInteractiveShell) patch.interactive_shell = interactiveShell;
       await api.saveAgentConfig(agentKey, patch);
-      toast.success("已保存运行配置（立即生效）");
+      toast.success("Конфигурация выполнения сохранена (применяется немедленно)");
       reload();
     } catch (e) {
-      toast.error("保存失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения: " + (e as Error).message);
     }
   }
   // applyVis optimistically updates, persists, and toasts success/failure. On
@@ -210,7 +211,7 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
     } catch (e) {
       setMcpVisible(prevMcp);
       setSkillVisible(prevSkill);
-      toast.error("保存失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения: " + (e as Error).message);
     }
   }
   function toggleMcp(id: number) {
@@ -219,7 +220,7 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
     applyVis(
       on ? mcpVisible.filter((x) => x !== id) : [...mcpVisible, id],
       skillVisible,
-      `${on ? "已取消" : "已开启"} MCP「${name}」可见`,
+      `Видимость MCP «${name}» ${on ? "отключена" : "включена"}`,
     );
   }
   function toggleSkill(name: string) {
@@ -227,7 +228,7 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
     applyVis(
       mcpVisible,
       on ? skillVisible.filter((x) => x !== name) : [...skillVisible, name],
-      `${on ? "已取消" : "已开启"} Skill「${name}」可见`,
+      `Видимость Skill «${name}» ${on ? "отключена" : "включена"}`,
     );
   }
   async function toggleTool(t: Tool) {
@@ -242,17 +243,17 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
         agents: nextAgents,
         enabled: t.enabled,
       });
-      toast.success(`${on ? "已解绑" : "已绑定"}工具「${t.key}」`);
-      onSaved?.(); // refresh the list so the card's 工具 count stays in sync
+      toast.success(`Инструмент «${t.key}» ${on ? "отвязан" : "привязан"}`);
+      onSaved?.(); // refresh the list so the card's tool count stays in sync
     } catch (e) {
-      toast.error("保存工具绑定失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения привязки инструмента: " + (e as Error).message);
       reload();
       api.tools().then(setTools).catch(() => {});
     }
   }
 
   if (loaded && !detail) {
-    return <div className="text-muted-foreground p-6 text-center text-sm">未找到 Agent：{agentKey}</div>;
+    return <div className="text-muted-foreground p-6 text-center text-sm">Agent не найден: {agentKey}</div>;
   }
   // config is meaningless for the conversational main agent and the fixed-budget
   // goals decomposer; every other agent (workers, custom assistants) honors it.
@@ -260,9 +261,9 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
   // web search applies to every conversational/executing agent except the one-shot
   // goals decomposer; it's gated by the global master switch.
   const showWebSearch = agentKey !== "goals";
-  // interactive shell (持久 PTY 会话工具族) 同样对除 goals 外的 agent 开放;无全局门控。
+  // Интерактивная shell (семейство инструментов постоянной сессии PTY) также открыта для всех agent, кроме goals; без глобального переключателя.
   const showInteractiveShell = agentKey !== "goals";
-  // 每个 agent(含 goals/mainagent)都跑在某个 LLM 上,故「默认模型」绑定对所有 agent 开放。
+  // Каждый agent (включая goals/mainagent) выполняется на какой-либо LLM, поэтому привязка «модели по умолчанию» открыта для всех agent.
   const showLLM = true;
   // triggers (P3) only attach to custom agents.
   const isCustom = !!detail && !detail.agent?.builtin;
@@ -270,38 +271,38 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
   return (
     <Tabs defaultValue="prompt" className="flex min-h-0 flex-1 flex-col">
       <TabsList className="mx-4 mt-2 w-fit">
-        <TabsTrigger value="prompt">配置与提示词</TabsTrigger>
-        <TabsTrigger value="wrapup">收尾提示词</TabsTrigger>
+        <TabsTrigger value="prompt">Конфигурация и промпт</TabsTrigger>
+        <TabsTrigger value="wrapup">Промпт завершения</TabsTrigger>
         <TabsTrigger value="mcp">MCP</TabsTrigger>
         <TabsTrigger value="skill">Skill</TabsTrigger>
         <TabsTrigger value="tools">Tools</TabsTrigger>
-        {isCustom && <TabsTrigger value="triggers">触发</TabsTrigger>}
+        {isCustom && <TabsTrigger value="triggers">Триггеры</TabsTrigger>}
       </TabsList>
 
-      {/* 配置 + 提示词 */}
+      {/* Конфигурация + промпт */}
       <TabsContent value="prompt" className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         <div className="grid gap-4">
           {(showLLM || showConfig || showWebSearch || showInteractiveShell) && (
             <div className="grid gap-3 rounded-md border p-3">
               {showLLM && (
                 <div className="grid gap-1.5">
-                  <Label htmlFor="llm-profile" className="text-xs">默认模型（LLM 配置）</Label>
+                  <Label htmlFor="llm-profile" className="text-xs">Модель по умолчанию (конфигурация LLM)</Label>
                   <div className="flex flex-wrap items-center gap-3">
                     <Select value={llmProfileId || "__follow__"} onValueChange={(v) => setLlmProfileId(v === "__follow__" ? "" : v)}>
                       <SelectTrigger id="llm-profile" className="h-8 w-72">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__follow__">跟随任务 / 全局激活配置</SelectItem>
+                        <SelectItem value="__follow__">Следовать за задачей / глобальной активной конфигурацией</SelectItem>
                         {llmProfiles.map((p) => (
                           <SelectItem key={p.id} value={String(p.id)}>
-                            {p.name}（{p.model}）{p.is_default ? " · 默认" : ""}
+                            {p.name} ({p.model}){p.is_default ? " · по умолчанию" : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <span className="text-muted-foreground max-w-md text-xs">
-                      为该 Agent 绑定固定 LLM 配置（点「保存配置」生效）。优先级：Agent 绑定 &gt; 任务/会话指定 &gt; 全局激活。
+                      Привязать к этому Agent фиксированную конфигурацию LLM (применяется после «Сохранить конфигурацию»). Приоритет: привязка Agent &gt; указано в задаче/сессии &gt; глобальная активная.
                     </span>
                   </div>
                 </div>
@@ -310,19 +311,19 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
                 {showConfig && (
                   <>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="max-turns" className="text-xs">最大循环次数（0=不限）</Label>
+                      <Label htmlFor="max-turns" className="text-xs">Максимум циклов (0 = без ограничения)</Label>
                       <Input id="max-turns" type="number" min={0} className="h-8 w-32"
                         value={maxTurns} onChange={(e) => setMaxTurns(e.target.value)} />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="run-seconds" className="text-xs">运行时长（秒，0=不限）</Label>
+                      <Label htmlFor="run-seconds" className="text-xs">Время выполнения (сек, 0 = без ограничения)</Label>
                       <Input id="run-seconds" type="number" min={0} className="h-8 w-32"
                         value={runSecs} onChange={(e) => setRunSecs(e.target.value)} />
                     </div>
                   </>
                 )}
                 <Button size="sm" variant="outline" onClick={saveConfig}>
-                  <SaveIcon /> 保存配置
+                  <SaveIcon /> Сохранить конфигурацию
                 </Button>
               </div>
               {showWebSearch && (
@@ -334,11 +335,11 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
                     onCheckedChange={setWebSearch}
                   />
                   <div className="grid gap-0.5">
-                    <Label htmlFor="web-search" className="text-sm">网络搜索</Label>
+                    <Label htmlFor="web-search" className="text-sm">Веб-поиск</Label>
                     <span className="text-muted-foreground text-xs">
                       {webSearchGlobalOn
-                        ? "为该 Agent 开启后（点上方保存生效），可用 web_search 联网检索"
-                        : "需先在「系统配置」开启网络搜索并配置后端，才能在此启用"}
+                        ? "После включения для этого Agent (применяется после сохранения выше) доступен веб-поиск через web_search"
+                        : "Сначала включите веб-поиск и настройте backend в «Системной конфигурации», только после этого можно включить здесь"}
                     </span>
                   </div>
                 </div>
@@ -351,9 +352,11 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
                     onCheckedChange={setInteractiveShell}
                   />
                   <div className="grid gap-0.5">
-                    <Label htmlFor="interactive-shell" className="text-sm">交互式 Shell</Label>
+                    <Label htmlFor="interactive-shell" className="text-sm">Интерактивная Shell</Label>
                     <span className="text-muted-foreground text-xs">
-                      为该 Agent 开启后（点上方保存生效），可用持久 PTY 会话工具（shell_open/send/read/close/list）驱动 msfconsole/ssh/REPL 等交互程序
+                      После включения для этого Agent (применяется после сохранения выше) доступны инструменты
+                      постоянной сессии PTY (shell_open/send/read/close/list) для управления интерактивными
+                      программами типа msfconsole/ssh/REPL
                     </span>
                   </div>
                 </div>
@@ -362,7 +365,7 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
           )}
 
           <div className="grid gap-2">
-            <Label className="text-muted-foreground text-xs">变量（点击插入占位符，渲染时由运行时数据替换）</Label>
+            <Label className="text-muted-foreground text-xs">Переменные (нажмите, чтобы вставить плейсхолдер — при рендере он заменяется данными времени выполнения)</Label>
             <div className="flex flex-wrap gap-2">
               {variables.map((v) => (
                 <Tooltip key={v.name}>
@@ -375,28 +378,28 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <p className="font-medium">{v.description}</p>
-                    <p className="text-muted-foreground mt-1">示例：{v.example}</p>
+                    <p className="text-muted-foreground mt-1">Пример: {v.example}</p>
                   </TooltipContent>
                 </Tooltip>
               ))}
-              {variables.length === 0 && <span className="text-muted-foreground text-xs">（无变量）</span>}
+              {variables.length === 0 && <span className="text-muted-foreground text-xs">(нет переменных)</span>}
             </div>
           </div>
 
           <Textarea className="font-mono text-xs" rows={16} value={prompt}
-            placeholder="留空则使用内置默认提示词" onChange={(e) => setPrompt(e.target.value)} />
+            placeholder="Оставьте пустым, чтобы использовать встроенный промпт по умолчанию" onChange={(e) => setPrompt(e.target.value)} />
 
           <div className="flex flex-wrap gap-2">
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={doPreview}>
-                  <EyeIcon /> 预览渲染
+                  <EyeIcon /> Предпросмотр рендера
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>渲染预览</DialogTitle>
-                  <DialogDescription>所有 {`{{.Var}}`} 已由后端用示例值替换。</DialogDescription>
+                  <DialogTitle>Предпросмотр рендера</DialogTitle>
+                  <DialogDescription>Все {`{{.Var}}`} заменены backend'ом на примерные значения.</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[60vh] overflow-auto rounded-md border bg-muted/30 p-3">
                   <Markdown text={preview} />
@@ -404,26 +407,26 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
               </DialogContent>
             </Dialog>
             <Button size="sm" onClick={savePrompt}>
-              <SaveIcon /> 保存为新版本
+              <SaveIcon /> Сохранить как новую версию
             </Button>
             <Button variant="outline" size="sm" onClick={resetPrompt}>
-              <RotateCcwIcon /> 恢复默认
+              <RotateCcwIcon /> Восстановить по умолчанию
             </Button>
           </div>
 
 
           <Separator />
           <div className="grid gap-2">
-            <Label className="text-muted-foreground text-xs">版本历史</Label>
+            <Label className="text-muted-foreground text-xs">История версий</Label>
             <ul className="grid gap-1">
               {versions.map((ver, i) => (
                 <li key={ver.version} className="flex items-center gap-2 rounded-md px-1 py-0.5 text-xs hover:bg-muted/50">
                   <span className="font-mono shrink-0">v{ver.version}</span>
-                  {i === 0 && <Badge variant="secondary" className="px-1.5 py-0 shrink-0">当前</Badge>}
+                  {i === 0 && <Badge variant="secondary" className="px-1.5 py-0 shrink-0">Текущая</Badge>}
                   <span className="text-muted-foreground truncate flex-1">{ver.note}</span>
                   {ver.ts && (
                     <span className="text-muted-foreground/60 shrink-0 tabular-nums">
-                      {new Date(ver.ts).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(ver.ts).toLocaleDateString("ru-RU", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
                   <Button variant="ghost" size="icon-sm" className="size-6 shrink-0" onClick={() => setViewVer(ver)}>
@@ -437,59 +440,59 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
                 </li>
               ))}
               {versions.length === 0 && (
-                <li className="text-muted-foreground text-xs">（暂无保存的版本，使用内置默认）</li>
+                <li className="text-muted-foreground text-xs">(пока нет сохранённых версий, используется встроенное значение по умолчанию)</li>
               )}
             </ul>
           </div>
 
-          {/* 查看版本 dialog */}
+          {/* диалог просмотра версии */}
           <Dialog open={!!viewVer} onOpenChange={(o) => { if (!o) setViewVer(null); }}>
             <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>
                   v{viewVer?.version}
                   {viewVer?.version === versions[0]?.version && (
-                    <Badge variant="secondary" className="ml-2 px-1.5 py-0 align-middle">当前</Badge>
+                    <Badge variant="secondary" className="ml-2 px-1.5 py-0 align-middle">Текущая</Badge>
                   )}
                 </DialogTitle>
                 <DialogDescription>
-                  {viewVer?.note || "（无备注）"}
+                  {viewVer?.note || "(без примечания)"}
                   {viewVer?.ts && (
                     <span className="ml-2 text-muted-foreground/60">
-                      {new Date(viewVer.ts).toLocaleString("zh-CN")}
+                      {new Date(viewVer.ts).toLocaleString("ru-RU")}
                     </span>
                   )}
                 </DialogDescription>
               </DialogHeader>
               <pre className="bg-muted max-h-[55vh] overflow-auto whitespace-pre-wrap rounded-md p-3 font-mono text-xs">
-                {viewVer?.template_text || "（空）"}
+                {viewVer?.template_text || "(пусто)"}
               </pre>
               <div className="flex gap-2 justify-end">
                 {viewVer && viewVer.version !== versions[0]?.version && (
                   <Button variant="outline" size="sm" onClick={() => {
                     if (viewVer) { setDiffVer(viewVer); setViewVer(null); }
                   }}>
-                    <GitCompareIcon className="mr-1 size-3.5" /> 与当前版本对比
+                    <GitCompareIcon className="mr-1 size-3.5" /> Сравнить с текущей версией
                   </Button>
                 )}
                 <Button size="sm" onClick={() => {
-                  if (viewVer) { setPrompt(viewVer.template_text); setViewVer(null); toast.success(`已加载 v${viewVer.version} 到编辑器，确认后点「保存为新版本」`); }
+                  if (viewVer) { setPrompt(viewVer.template_text); setViewVer(null); toast.success(`v${viewVer.version} загружена в редактор, после проверки нажмите «Сохранить как новую версию»`); }
                 }}>
-                  加载到编辑器
+                  Загрузить в редактор
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
 
-          {/* 版本对比 dialog */}
+          {/* диалог сравнения версий */}
           <Dialog open={!!diffVer} onOpenChange={(o) => { if (!o) setDiffVer(null); }}>
             <DialogContent className="sm:max-w-3xl">
               <DialogHeader>
-                <DialogTitle>版本对比：v{diffVer?.version} → v{versions[0]?.version}（当前）</DialogTitle>
+                <DialogTitle>Сравнение версий: v{diffVer?.version} → v{versions[0]?.version} (текущая)</DialogTitle>
                 <DialogDescription>
                   <span className="inline-flex items-center gap-3 text-xs">
-                    <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-600 dark:text-red-400">- 删除</span>
-                    <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-600 dark:text-green-400">+ 新增</span>
+                    <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-600 dark:text-red-400">- удалено</span>
+                    <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-600 dark:text-green-400">+ добавлено</span>
                   </span>
                 </DialogDescription>
               </DialogHeader>
@@ -499,44 +502,46 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
         </div>
       </TabsContent>
 
-      {/* 收尾提示词 */}
+      {/* промпт завершения */}
       <TabsContent value="wrapup" className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         <div className="grid gap-3">
           <p className="text-muted-foreground text-xs leading-relaxed">
-            当此 Agent 因<b>超时</b>或<b>步数耗尽</b>被终止时，系统会注入这段「收尾提示词」跑一轮收尾：
-            先把已识别但未落库的内容写回，再输出一句总结（避免烂尾）。留空则使用内置默认。
+            Когда этот Agent останавливается из-за <b>таймаута</b> или <b>исчерпания шагов</b>, система внедряет
+            этот «промпт завершения» и запускает ещё один ход завершения: сначала записываются уже выявленные,
+            но не сохранённые в базу данные, затем выводится итоговое резюме (чтобы избежать обрыва на
+            середине). Оставьте пустым для использования встроенного значения по умолчанию.
           </p>
           <div className="flex items-center gap-2">
-            <Label className="text-xs">收尾提示词正文</Label>
+            <Label className="text-xs">Текст промпта завершения</Label>
             {wrapup.trim() ? (
-              <Badge variant="secondary" className="px-1.5 py-0">自定义</Badge>
+              <Badge variant="secondary" className="px-1.5 py-0">Пользовательский</Badge>
             ) : (
-              <Badge variant="outline" className="px-1.5 py-0">使用内置默认</Badge>
+              <Badge variant="outline" className="px-1.5 py-0">Используется встроенное значение</Badge>
             )}
           </div>
           <Textarea
             className="font-mono text-xs"
             rows={10}
             value={wrapup}
-            placeholder={wrapupDefault || "留空则使用内置默认收尾提示词"}
+            placeholder={wrapupDefault || "Оставьте пустым для использования встроенного промпта завершения по умолчанию"}
             onChange={(e) => setWrapup(e.target.value)}
           />
           <div className="grid gap-1.5">
             <Label htmlFor="wrapup-turns" className="text-xs">
-              收尾轮数（收尾阶段自身最多跑几轮；0=用内置默认 {wrapupTurnsDefault} 轮）
+              Количество ходов завершения (сколько максимум ходов выполняет сама стадия завершения; 0 = встроенное значение по умолчанию, {wrapupTurnsDefault})
             </Label>
             <Input id="wrapup-turns" type="number" min={0} className="h-8 w-32"
               value={wrapupTurns} onChange={(e) => setWrapupTurns(e.target.value)} />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={saveWrapup}>保存</Button>
-            <Button size="sm" variant="outline" onClick={resetWrapup}>恢复默认</Button>
+            <Button size="sm" onClick={saveWrapup}>Сохранить</Button>
+            <Button size="sm" variant="outline" onClick={resetWrapup}>Восстановить по умолчанию</Button>
           </div>
           {wrapupDefault && (
             <>
               <Separator />
               <div className="grid gap-1.5">
-                <Label className="text-muted-foreground text-xs">内置默认（只读，供参考）</Label>
+                <Label className="text-muted-foreground text-xs">Встроенное значение по умолчанию (только для чтения, для справки)</Label>
                 <pre className="text-muted-foreground max-h-40 overflow-y-auto rounded-md border bg-muted/30 p-2 text-xs whitespace-pre-wrap">
                   {wrapupDefault}
                 </pre>
@@ -548,38 +553,41 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
             <>
               <Separator className="my-2" />
               <p className="text-muted-foreground text-xs leading-relaxed">
-                <b>任务超时收尾</b>（与上面的 per-run 收尾是<b>两套</b>）：当<b>整个任务</b>到达超时上限、即将结束时注入。
-                与 per-run 语义常相反（如 planner：per-run 说“别停继续规划”，任务超时说“到点停止、做最后判定”）。留空则用内置默认。
+                <b>Завершение при таймауте задачи</b> (это <b>отдельный механизм</b> от завершения per-run выше):
+                внедряется, когда <b>вся задача</b> достигает лимита таймаута и близка к завершению. Семантика
+                часто противоположна per-run (например, у planner: per-run говорит «не останавливайся, продолжай
+                планировать», а таймаут задачи — «пора остановиться и принять окончательное решение»). Оставьте
+                пустым для использования встроенного значения по умолчанию.
               </p>
               <div className="flex items-center gap-2">
-                <Label className="text-xs">任务超时收尾提示词正文</Label>
+                <Label className="text-xs">Текст промпта завершения при таймауте задачи</Label>
                 {ttWrapup.trim() ? (
-                  <Badge variant="secondary" className="px-1.5 py-0">自定义</Badge>
+                  <Badge variant="secondary" className="px-1.5 py-0">Пользовательский</Badge>
                 ) : (
-                  <Badge variant="outline" className="px-1.5 py-0">使用内置默认</Badge>
+                  <Badge variant="outline" className="px-1.5 py-0">Используется встроенное значение</Badge>
                 )}
               </div>
               <Textarea
                 className="font-mono text-xs"
                 rows={10}
                 value={ttWrapup}
-                placeholder={ttWrapupDefault || "留空则使用内置默认任务超时收尾提示词"}
+                placeholder={ttWrapupDefault || "Оставьте пустым для использования встроенного промпта завершения при таймауте задачи"}
                 onChange={(e) => setTtWrapup(e.target.value)}
               />
               <div className="grid gap-1.5">
                 <Label htmlFor="tt-turns" className="text-xs">
-                  收尾轮数（0=用内置默认 {ttTurnsDefault} 轮）
+                  Количество ходов завершения (0 = встроенное значение по умолчанию, {ttTurnsDefault})
                 </Label>
                 <Input id="tt-turns" type="number" min={0} className="h-8 w-32"
                   value={ttTurns} onChange={(e) => setTtTurns(e.target.value)} />
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={saveTaskTimeoutWrapup}>保存</Button>
-                <Button size="sm" variant="outline" onClick={resetTaskTimeoutWrapup}>恢复默认</Button>
+                <Button size="sm" onClick={saveTaskTimeoutWrapup}>Сохранить</Button>
+                <Button size="sm" variant="outline" onClick={resetTaskTimeoutWrapup}>Восстановить по умолчанию</Button>
               </div>
               {ttWrapupDefault && (
                 <div className="grid gap-1.5">
-                  <Label className="text-muted-foreground text-xs">内置默认（只读，供参考）</Label>
+                  <Label className="text-muted-foreground text-xs">Встроенное значение по умолчанию (только для чтения, для справки)</Label>
                   <pre className="text-muted-foreground max-h-40 overflow-y-auto rounded-md border bg-muted/30 p-2 text-xs whitespace-pre-wrap">
                     {ttWrapupDefault}
                   </pre>
@@ -590,9 +598,9 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
         </div>
       </TabsContent>
 
-      {/* MCP 可见性 */}
+      {/* видимость MCP */}
       <TabsContent value="mcp" className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <p className="text-muted-foreground mb-3 text-xs">勾选此 Agent 可见的 MCP 服务器。</p>
+        <p className="text-muted-foreground mb-3 text-xs">Отметьте серверы MCP, видимые для этого Agent.</p>
         <div className="grid gap-2">
           {mcp.map((m) => (
             <label key={m.id} className="flex items-center gap-2 rounded-md border p-2 text-sm">
@@ -601,13 +609,13 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
               <span className="text-muted-foreground ml-auto text-xs">{m.transport}</span>
             </label>
           ))}
-          {mcp.length === 0 && <span className="text-muted-foreground text-xs">（暂无 MCP）</span>}
+          {mcp.length === 0 && <span className="text-muted-foreground text-xs">(пока нет MCP)</span>}
         </div>
       </TabsContent>
 
-      {/* Skill 可见性 */}
+      {/* видимость Skill */}
       <TabsContent value="skill" className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <p className="text-muted-foreground mb-3 text-xs">勾选此 Agent 可见的 Skill。</p>
+        <p className="text-muted-foreground mb-3 text-xs">Отметьте Skill, видимые для этого Agent.</p>
         <div className="grid gap-2">
           {skills.map((s) => (
             <label key={s.name} className="flex items-center gap-2 rounded-md border p-2 text-sm">
@@ -616,17 +624,17 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
               {s.description && <span className="text-muted-foreground ml-auto truncate text-xs">{s.description}</span>}
             </label>
           ))}
-          {skills.length === 0 && <span className="text-muted-foreground text-xs">（暂无 Skill）</span>}
+          {skills.length === 0 && <span className="text-muted-foreground text-xs">(пока нет Skill)</span>}
         </div>
       </TabsContent>
 
-      {/* Tools 绑定 */}
+      {/* привязка Tools */}
       <TabsContent value="tools" className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <p className="text-muted-foreground mb-3 text-xs">勾选绑定给此 Agent 的内置工具。</p>
+        <p className="text-muted-foreground mb-3 text-xs">Отметьте встроенные инструменты, привязанные к этому Agent.</p>
         <div className="grid gap-2">
           {tools.map((t) => {
             const isTraffic = TRAFFIC_TOOL_KEYS.has(t.key);
-            const gated = isTraffic && !captureOn; // traffic tools need 流量捕获 on
+            const gated = isTraffic && !captureOn; // traffic tools need traffic capture on
             return (
               <label
                 key={t.key}
@@ -642,13 +650,13 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
                 />
                 <span className="font-mono text-xs">{t.key}</span>
                 {isTraffic && (
-                  <Badge variant="secondary" className="px-1 py-0 text-[9px]">流量</Badge>
+                  <Badge variant="secondary" className="px-1 py-0 text-[9px]">Трафик</Badge>
                 )}
                 {!t.enabled && (
-                  <Badge variant="outline" className="text-destructive px-1 py-0 text-[9px]">已停用</Badge>
+                  <Badge variant="outline" className="text-destructive px-1 py-0 text-[9px]">Выключен</Badge>
                 )}
                 {gated ? (
-                  <span className="text-muted-foreground ml-auto text-xs">需开启流量捕获</span>
+                  <span className="text-muted-foreground ml-auto text-xs">Требуется включить захват трафика</span>
                 ) : (
                   t.description && (
                     <span className="text-muted-foreground ml-auto line-clamp-1 max-w-[55%] text-xs">
@@ -659,11 +667,11 @@ export function AgentEditor({ agentKey, onSaved }: { agentKey: string; onSaved?:
               </label>
             );
           })}
-          {tools.length === 0 && <span className="text-muted-foreground text-xs">（暂无工具）</span>}
+          {tools.length === 0 && <span className="text-muted-foreground text-xs">(пока нет инструментов)</span>}
         </div>
       </TabsContent>
 
-      {/* 触发(P3, 仅自定义 agent) */}
+      {/* триггеры (P3, только для пользовательских agent) */}
       {isCustom && (
         <TabsContent value="triggers" className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           <AgentTriggersTab agentKey={agentKey} agent={detail?.agent} />
@@ -728,12 +736,13 @@ function DiffView({ oldText, newText }: { oldText: string; newText: string }) {
 }
 
 // AgentTriggersTab manages a custom agent's P3 triggers: list + add + delete.
-// Each trigger fires (定时/发现finding/目标达成/任务超时/工具调用，可多选) → a new conversation runs
-// in parallel with the base user message + auto context appended by the backend.
+// Each trigger fires (interval/finding found/goal met/task timeout/tool call, multiple
+// selectable) → a new conversation runs in parallel with the base user message + auto
+// context appended by the backend.
 function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent }) {
   const [triggers, setTriggers] = React.useState<AgentTrigger[]>([]);
   const [tools, setTools] = React.useState<Tool[]>([]);
-  // 触发后处理策略(每 agent);初值来自 agent detail,改动即保存。
+  // Стратегия обработки после срабатывания (на каждый agent); исходное значение берётся из agent detail, изменение сохраняется сразу.
   const [runMode, setRunMode] = React.useState<"serial" | "parallel">(agent?.trigger_run_mode ?? "serial");
   const [mergeMode, setMergeMode] = React.useState<"by_task" | "all" | "none">(agent?.trigger_merge_mode ?? "all");
   const [maxParallel, setMaxParallel] = React.useState(String(agent?.trigger_max_parallel ?? 5));
@@ -751,7 +760,7 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
     try {
       await api.saveAgentConfig(agentKey, patch);
     } catch (e) {
-      toast.error("保存策略失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения стратегии: " + (e as Error).message);
     }
   }
   const [onInterval, setOnInterval] = React.useState(false);
@@ -769,7 +778,7 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
   const [taskCreateMsg, setTaskCreateMsg] = React.useState("");
   const [toolNames, setToolNames] = React.useState<string[]>([]);
   const [saving, setSaving] = React.useState(false);
-  // null = 新增模式；非 null = 正在编辑该 id 的触发器。
+  // null = режим добавления; не null = редактируется триггер с этим id.
   const [editingId, setEditingId] = React.useState<number | null>(null);
 
   const reload = React.useCallback(() => {
@@ -786,7 +795,7 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
     setToolNames((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
 
-  // resetForm 清空表单并回到「新增」模式。
+  // resetForm очищает форму и возвращает в режим «добавление».
   function resetForm() {
     setEditingId(null);
     setOnInterval(false);
@@ -805,7 +814,7 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
     setToolNames([]);
   }
 
-  // startEdit 把某条已有触发器灌进表单,进入「编辑」模式。
+  // startEdit заполняет форму данными существующего триггера и переходит в режим «редактирование».
   function startEdit(t: AgentTrigger) {
     setEditingId(t.id);
     setOnInterval(t.interval_sec > 0);
@@ -824,15 +833,15 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
     setToolNames(t.tool_names ?? []);
   }
 
-  // submit 依 editingId 走「新增」或「保存修改」;编辑时保留该触发器的启用状态。
+  // submit в зависимости от editingId выполняет «добавление» или «сохранение изменений»; при редактировании сохраняется текущее состояние включённости триггера.
   async function submit() {
     const n = onInterval ? Math.max(1, Math.floor(Number(intervalSec) || 0)) : 0;
     if (n === 0 && !onFinding && !onGoalMet && !onTaskTimeout && !onToolCall && !onTaskCreate) {
-      toast.error("至少选择一种触发条件");
+      toast.error("Выберите хотя бы одно условие срабатывания");
       return;
     }
     if (onToolCall && toolNames.length === 0) {
-      toast.error("工具调用触发至少选择一个工具");
+      toast.error("Для триггера по вызову инструмента выберите хотя бы один инструмент");
       return;
     }
     const body = {
@@ -855,15 +864,15 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
       if (editingId != null) {
         const cur = triggers.find((x) => x.id === editingId);
         await api.updateTrigger(editingId, { ...body, enabled: cur?.enabled ?? true });
-        toast.success("已保存修改");
+        toast.success("Изменения сохранены");
       } else {
         await api.createTrigger(agentKey, { ...body, enabled: true });
-        toast.success("已添加触发器");
+        toast.success("Триггер добавлен");
       }
       resetForm();
       reload();
     } catch (e) {
-      toast.error((editingId != null ? "保存失败：" : "添加失败：") + (e as Error).message);
+      toast.error((editingId != null ? "Ошибка сохранения: " : "Ошибка добавления: ") + (e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -888,7 +897,7 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
       });
       reload();
     } catch (e) {
-      toast.error("保存失败：" + (e as Error).message);
+      toast.error("Ошибка сохранения: " + (e as Error).message);
     }
   }
   async function del(id: number) {
@@ -897,34 +906,36 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
       if (editingId === id) resetForm();
       reload();
     } catch (e) {
-      toast.error("删除失败：" + (e as Error).message);
+      toast.error("Ошибка удаления: " + (e as Error).message);
     }
   }
 
   function condLabel(t: AgentTrigger): string {
     const parts: string[] = [];
-    if (t.interval_sec > 0) parts.push(`每 ${t.interval_sec}s`);
-    if (t.on_finding) parts.push("发现 finding");
-    if (t.on_goal_met) parts.push("目标达成");
-    if (t.on_task_timeout) parts.push("任务超时");
-    if (t.on_tool_call) parts.push(`工具调用(${t.tool_names.length})`);
-    if (t.on_task_create) parts.push("任务创建");
-    return parts.join(" · ") || "（无条件）";
+    if (t.interval_sec > 0) parts.push(`каждые ${t.interval_sec}с`);
+    if (t.on_finding) parts.push("обнаружена находка");
+    if (t.on_goal_met) parts.push("цель достигнута");
+    if (t.on_task_timeout) parts.push("таймаут задачи");
+    if (t.on_tool_call) parts.push(`вызов инструмента (${t.tool_names.length})`);
+    if (t.on_task_create) parts.push("создание задачи");
+    return parts.join(" · ") || "(без условий)";
   }
 
   return (
     <div className="grid gap-4">
       <p className="text-muted-foreground text-xs">
-        触发器让这个自定义 Agent 自动运行：每次触发都<b>新建一个会话运行</b>（在「对话」页可见）。
-        可多选触发条件；系统会把「本次为何触发 + 相关任务/finding/目标」自动附加到你写的基础消息后面。
+        Триггеры позволяют этому пользовательскому Agent запускаться автоматически: каждое срабатывание
+        <b> создаёт новый запуск диалога</b> (виден на странице «Диалог»). Можно выбрать сразу несколько
+        условий срабатывания; система автоматически добавит «почему сработал триггер + связанная
+        задача/находка/цель» после написанного вами базового сообщения.
       </p>
 
-      {/* 触发后处理策略 */}
+      {/* стратегия обработки после срабатывания */}
       <div className="grid gap-3 rounded-md border p-3">
-        <Label className="text-muted-foreground text-xs">触发后处理策略（决定触发如何排队/合并运行）</Label>
+        <Label className="text-muted-foreground text-xs">Стратегия обработки после срабатывания (определяет, как срабатывания ставятся в очередь/объединяются)</Label>
         <div className="flex flex-wrap items-center gap-4">
           <div className="grid gap-1">
-            <Label className="text-xs">运行模式</Label>
+            <Label className="text-xs">Режим выполнения</Label>
             <Select
               value={runMode}
               onValueChange={(v) => {
@@ -937,14 +948,14 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper">
-                <SelectItem value="serial">串行（排队，一次一个）</SelectItem>
-                <SelectItem value="parallel">并行（各自并发会话）</SelectItem>
+                <SelectItem value="serial">Последовательно (очередь, по одному)</SelectItem>
+                <SelectItem value="parallel">Параллельно (отдельные одновременные сессии)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-1">
-            <Label className="text-xs">合并模式</Label>
+            <Label className="text-xs">Режим объединения</Label>
             <Select
               value={mergeMode}
               disabled={runMode === "parallel"}
@@ -958,16 +969,16 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper">
-                <SelectItem value="by_task">按任务合并</SelectItem>
-                <SelectItem value="all">全部合并成一条</SelectItem>
-                <SelectItem value="none">不合并</SelectItem>
+                <SelectItem value="by_task">Объединять по задаче</SelectItem>
+                <SelectItem value="all">Объединить все в одно</SelectItem>
+                <SelectItem value="none">Не объединять</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {runMode === "parallel" && (
             <div className="grid gap-1">
-              <Label htmlFor="tr-maxpar" className="text-xs">最大并发（0=不限）</Label>
+              <Label htmlFor="tr-maxpar" className="text-xs">Максимум параллельных (0 = без ограничения)</Label>
               <Input
                 id="tr-maxpar"
                 type="number"
@@ -986,87 +997,88 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
         </div>
         <p className="text-muted-foreground text-xs">
           {runMode === "parallel"
-            ? "并行：每次触发立即各开一个会话并发运行，不合并；超过最大并发的触发排队等空位。"
+            ? "Параллельно: каждое срабатывание сразу открывает отдельную сессию и выполняется одновременно с остальными, без объединения; срабатывания сверх максимума параллельных ставятся в очередь на свободное место."
             : mergeMode === "by_task"
-              ? "串行·按任务合并：同 agent 一次跑一个；排队中同一任务的事件触发合并成一条会话。"
+              ? "Последовательно · объединение по задаче: один и тот же agent выполняет по одной сессии за раз; события одной задачи, накопившиеся в очереди, объединяются в одну сессию."
               : mergeMode === "all"
-                ? "串行·全部合并：同 agent 一次跑一个；取队列时把当前排队的所有触发合并成一条会话。"
-                : "串行·不合并：同 agent 一次跑一个；每条触发各自一个会话。"}
+                ? "Последовательно · объединение всех: один и тот же agent выполняет по одной сессии за раз; при взятии из очереди все накопившиеся срабатывания объединяются в одну сессию."
+                : "Последовательно · без объединения: один и тот же agent выполняет по одной сессии за раз; каждое срабатывание — отдельная сессия."}
         </p>
       </div>
 
-      {/* 新增 / 编辑触发器 */}
+      {/* добавление / редактирование триггера */}
       <div className="grid gap-3 rounded-md border p-3">
         <Label className="text-muted-foreground text-xs">
           {editingId != null
-            ? `编辑触发器 #${editingId}（改完点「保存修改」）`
-            : "新增触发器（每种条件可填各自的用户消息）"}
+            ? `Редактирование триггера #${editingId} (после изменений нажмите «Сохранить изменения»)`
+            : "Новый триггер (для каждого условия можно задать своё сообщение пользователя)"}
         </Label>
 
-        {/* 定时 */}
+        {/* по расписанию */}
         <div className="grid gap-1.5">
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={onInterval} onCheckedChange={(v) => setOnInterval(!!v)} /> 定时触发
+            <Checkbox checked={onInterval} onCheckedChange={(v) => setOnInterval(!!v)} /> Срабатывать по расписанию
           </label>
           {onInterval && (
             <div className="grid gap-1.5">
               <div className="flex items-center gap-2">
-                <Label htmlFor="tr-interval" className="text-xs">每</Label>
+                <Label htmlFor="tr-interval" className="text-xs">Каждые</Label>
                 <Input id="tr-interval" type="number" min={1} className="h-8 w-24"
                   value={intervalSec} onChange={(e) => setIntervalSec(e.target.value)} />
-                <span className="text-muted-foreground text-xs">秒</span>
+                <span className="text-muted-foreground text-xs">секунд</span>
               </div>
               <Textarea className="text-xs" rows={2} value={intervalMsg}
-                placeholder="定时触发时发给 agent 的话，如：巡检所有任务" onChange={(e) => setIntervalMsg(e.target.value)} />
+                placeholder="Что отправить agent при срабатывании по расписанию, например: проверить все задачи" onChange={(e) => setIntervalMsg(e.target.value)} />
             </div>
           )}
         </div>
 
-        {/* finding */}
+        {/* находка */}
         <div className="grid gap-1.5">
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={onFinding} onCheckedChange={(v) => setOnFinding(!!v)} /> 发现 finding 时触发
+            <Checkbox checked={onFinding} onCheckedChange={(v) => setOnFinding(!!v)} /> Срабатывать при обнаружении находки
           </label>
           {onFinding && (
             <Textarea className="text-xs" rows={2} value={findingMsg}
-              placeholder="发现 finding 时发给 agent 的话（系统会附带任务与 finding 详情）" onChange={(e) => setFindingMsg(e.target.value)} />
+              placeholder="Что отправить agent при обнаружении находки (система добавит детали задачи и находки)" onChange={(e) => setFindingMsg(e.target.value)} />
           )}
         </div>
 
-        {/* 目标达成 */}
+        {/* достижение цели */}
         <div className="grid gap-1.5">
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={onGoalMet} onCheckedChange={(v) => setOnGoalMet(!!v)} /> 目标达成时触发
+            <Checkbox checked={onGoalMet} onCheckedChange={(v) => setOnGoalMet(!!v)} /> Срабатывать при достижении цели
           </label>
           {onGoalMet && (
             <Textarea className="text-xs" rows={2} value={goalMsg}
-              placeholder="目标达成时发给 agent 的话（系统会附带任务与达成的目标）" onChange={(e) => setGoalMsg(e.target.value)} />
+              placeholder="Что отправить agent при достижении цели (система добавит задачу и достигнутую цель)" onChange={(e) => setGoalMsg(e.target.value)} />
           )}
         </div>
 
-        {/* 任务超时 */}
+        {/* таймаут задачи */}
         <div className="grid gap-1.5">
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={onTaskTimeout} onCheckedChange={(v) => setOnTaskTimeout(!!v)} /> 任务超时时触发
+            <Checkbox checked={onTaskTimeout} onCheckedChange={(v) => setOnTaskTimeout(!!v)} /> Срабатывать при таймауте задачи
           </label>
           {onTaskTimeout && (
             <Textarea className="text-xs" rows={2} value={taskTimeoutMsg}
-              placeholder="任务超时时发给 agent 的话（系统会附带任务编号与目标）" onChange={(e) => setTaskTimeoutMsg(e.target.value)} />
+              placeholder="Что отправить agent при таймауте задачи (система добавит номер задачи и цель)" onChange={(e) => setTaskTimeoutMsg(e.target.value)} />
           )}
         </div>
 
-        {/* 工具调用 */}
+        {/* вызов инструмента */}
         <div className="grid gap-1.5">
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={onToolCall} onCheckedChange={(v) => setOnToolCall(!!v)} /> 工具调用时触发
+            <Checkbox checked={onToolCall} onCheckedChange={(v) => setOnToolCall(!!v)} /> Срабатывать при вызове инструмента
           </label>
           {onToolCall && (
             <div className="grid gap-1.5">
               <div className="text-muted-foreground text-xs">
-                选择要监听的工具（至少一个）；任务执行中这些工具每次<b>调用完成</b>都会触发。已选 {toolNames.length} 个。
+                Выберите инструменты для отслеживания (минимум один); во время выполнения задачи триггер
+                срабатывает при каждом <b>завершении вызова</b> этих инструментов. Выбрано: {toolNames.length}.
               </div>
               <div className="max-h-40 overflow-y-auto rounded-md border p-2">
-                {tools.length === 0 && <span className="text-muted-foreground text-xs">（工具列表为空）</span>}
+                {tools.length === 0 && <span className="text-muted-foreground text-xs">(список инструментов пуст)</span>}
                 <div className="grid gap-1">
                   {tools.map((tool) => (
                     <label key={tool.key} className="flex items-start gap-2 text-xs">
@@ -1081,38 +1093,38 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
                 </div>
               </div>
               <Textarea className="text-xs" rows={2} value={toolCallMsg}
-                placeholder="工具被调用时发给 agent 的话（系统会附带任务信息、工具入参与返回内容）" onChange={(e) => setToolCallMsg(e.target.value)} />
+                placeholder="Что отправить agent при вызове инструмента (система добавит информацию о задаче, аргументы и результат вызова)" onChange={(e) => setToolCallMsg(e.target.value)} />
             </div>
           )}
         </div>
 
-        {/* 任务创建 */}
+        {/* создание задачи */}
         <div className="grid gap-1.5">
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={onTaskCreate} onCheckedChange={(v) => setOnTaskCreate(!!v)} /> 任务创建时触发
+            <Checkbox checked={onTaskCreate} onCheckedChange={(v) => setOnTaskCreate(!!v)} /> Срабатывать при создании задачи
           </label>
           {onTaskCreate && (
             <Textarea className="text-xs" rows={2} value={taskCreateMsg}
-              placeholder="任务被创建时发给 agent 的话（系统会附带任务编号与目标）" onChange={(e) => setTaskCreateMsg(e.target.value)} />
+              placeholder="Что отправить agent при создании задачи (система добавит номер задачи и цель)" onChange={(e) => setTaskCreateMsg(e.target.value)} />
           )}
         </div>
 
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={submit} disabled={saving}>
-            <SaveIcon /> {editingId != null ? "保存修改" : "添加触发器"}
+            <SaveIcon /> {editingId != null ? "Сохранить изменения" : "Добавить триггер"}
           </Button>
           {editingId != null && (
             <Button size="sm" variant="ghost" onClick={resetForm} disabled={saving}>
-              <XIcon /> 取消编辑
+              <XIcon /> Отменить редактирование
             </Button>
           )}
         </div>
       </div>
 
-      {/* 已有触发器 */}
+      {/* существующие триггеры */}
       <div className="grid gap-2">
-        <Label className="text-muted-foreground text-xs">已有触发器</Label>
-        {triggers.length === 0 && <span className="text-muted-foreground text-xs">（暂无）</span>}
+        <Label className="text-muted-foreground text-xs">Существующие триггеры</Label>
+        {triggers.length === 0 && <span className="text-muted-foreground text-xs">(пока нет)</span>}
         {triggers.map((t) => (
           <div
             key={t.id}
@@ -1126,29 +1138,29 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="font-medium">{condLabel(t)}</span>
                 {!t.enabled && (
-                  <Badge variant="outline" className="text-destructive px-1 py-0 text-[9px]">已停用</Badge>
+                  <Badge variant="outline" className="text-destructive px-1 py-0 text-[9px]">Выключен</Badge>
                 )}
               </div>
               <div className="text-muted-foreground grid gap-0.5 text-xs">
-                {t.interval_sec > 0 && t.interval_message && <div className="line-clamp-1">定时：{t.interval_message}</div>}
-                {t.on_finding && t.finding_message && <div className="line-clamp-1">finding：{t.finding_message}</div>}
-                {t.on_goal_met && t.goal_message && <div className="line-clamp-1">目标：{t.goal_message}</div>}
-                {t.on_task_timeout && t.task_timeout_message && <div className="line-clamp-1">超时：{t.task_timeout_message}</div>}
-                {t.on_task_create && t.task_create_message && <div className="line-clamp-1">任务创建：{t.task_create_message}</div>}
+                {t.interval_sec > 0 && t.interval_message && <div className="line-clamp-1">По расписанию: {t.interval_message}</div>}
+                {t.on_finding && t.finding_message && <div className="line-clamp-1">Находка: {t.finding_message}</div>}
+                {t.on_goal_met && t.goal_message && <div className="line-clamp-1">Цель: {t.goal_message}</div>}
+                {t.on_task_timeout && t.task_timeout_message && <div className="line-clamp-1">Таймаут: {t.task_timeout_message}</div>}
+                {t.on_task_create && t.task_create_message && <div className="line-clamp-1">Создание задачи: {t.task_create_message}</div>}
                 {t.on_tool_call && (
                   <>
-                    <div className="line-clamp-1">工具：{t.tool_names.join("、") || "（未选）"}</div>
-                    {t.tool_call_message && <div className="line-clamp-1">消息：{t.tool_call_message}</div>}
+                    <div className="line-clamp-1">Инструменты: {t.tool_names.join(", ") || "(не выбрано)"}</div>
+                    {t.tool_call_message && <div className="line-clamp-1">Сообщение: {t.tool_call_message}</div>}
                   </>
                 )}
               </div>
             </div>
             <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-foreground"
-              onClick={() => startEdit(t)} title="编辑">
+              onClick={() => startEdit(t)} title="Редактировать">
               <PencilIcon className="size-3.5" />
             </Button>
             <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive"
-              onClick={() => del(t.id)} title="删除">
+              onClick={() => del(t.id)} title="Удалить">
               <Trash2Icon className="size-3.5" />
             </Button>
           </div>
