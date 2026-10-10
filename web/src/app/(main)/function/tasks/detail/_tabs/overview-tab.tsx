@@ -41,42 +41,42 @@ import type {
   TaskScopeRow,
 } from "@/lib/types";
 
-// 紧凑格式化 token 数（12345 → 12.3k，2000000 → 2M）。
+// Компактное форматирование числа токенов (12345 → 12.3k, 2000000 → 2M).
 function fmtTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
   if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k";
   return String(n);
 }
 
-// 缓存命中率 = 缓存读 / 输入（InputTokens 已含 cache_read 子集，故比值在 0–100%）。
+// Процент попаданий в кеш = чтение кеша / вход (InputTokens уже включает подмножество cache_read, поэтому отношение в диапазоне 0–100%).
 function cacheHitRate(cacheRead: number, input: number): string {
   if (input <= 0) return "—";
   return Math.round((cacheRead / input) * 100) + "%";
 }
 
-// 测试范围一条的显示值：域名 / 网段 / 公司。
+// Отображаемое значение одной строки области: домен / подсеть / компания.
 function scopeValue(row: TaskScopeRow): string {
   if (row.value) return row.value;
   if (row.domain) return row.domain;
   if (row.net) return row.net;
-  if (row.company_id) return row.company_name?.trim() ? row.company_name : `企业 #${row.company_id}`;
+  if (row.company_id) return row.company_name?.trim() ? row.company_name : `Компания #${row.company_id}`;
   return "—";
 }
 
 const SCOPE_KIND_LABELS: Record<TaskScopeRow["kind"], string> = {
-  company: "公司",
-  root_domain: "根域名",
-  subdomain: "子域名",
+  company: "Компания",
+  root_domain: "Корневой домен",
+  subdomain: "Поддомен",
   ip: "IP",
-  cidr: "网段",
+  cidr: "Подсеть",
   icp: "ICP",
-  keyword: "关键词",
+  keyword: "Ключевое слово",
 };
 
 const SCOPE_SOURCE_LABELS: Record<TaskScopeRow["source"], string> = {
-  auto: "自动",
+  auto: "Автоматически",
   agent: "Agent",
-  manual: "手动",
+  manual: "Вручную",
 };
 
 function StatCard({
@@ -116,17 +116,17 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     pct: number | null;
     by_type: { type: string; total: number; tested: number }[];
   } | null>(null);
-  // 正在重跑的意图 id（含 "__all__" 表示批量），用于禁用按钮 + 转圈。
+  // ID повторяемых интентов (включая "__all__" для пакетного режима), для блокировки кнопки + анимации загрузки.
   const [rerunning, setRerunning] = React.useState<Set<string>>(new Set());
-  // 测试范围列表 + 新增表单状态。
+  // Список тестовой области + состояние формы добавления.
   const [scope, setScope] = React.useState<TaskScopeRow[]>([]);
   const [scopeKind, setScopeKind] = React.useState<TaskScopeRow["kind"]>("root_domain");
   const [scopeValueInput, setScopeValueInput] = React.useState("");
   const [scopeBusy, setScopeBusy] = React.useState(false);
   const [scopeErr, setScopeErr] = React.useState("");
-  // 按模型的 token 用量（来自常开的 llm_usage 计量账本，逐次精确）。
+  // Расход токенов по моделям (из постоянно включённого журнала учёта llm_usage, точный, по каждому вызову).
   const [modelTokens, setModelTokens] = React.useState<ModelTokenStat[]>([]);
-  // 目标管理：目标列表 + 新增表单 + 行内编辑状态。
+  // Управление целями: список целей + форма добавления + состояние строчного редактирования.
   const [goals, setGoals] = React.useState<TaskGoal[]>([]);
   const [goalText, setGoalText] = React.useState("");
   const [goalVuln, setGoalVuln] = React.useState("");
@@ -135,7 +135,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
   const [editingGoalId, setEditingGoalId] = React.useState<string | null>(null);
   const [editText, setEditText] = React.useState("");
   const [editVuln, setEditVuln] = React.useState("");
-  // 约束管理：约束列表 + 新增表单 + 行内编辑状态。
+  // Управление ограничениями: список ограничений + форма добавления + состояние строчного редактирования.
   const [constraints, setConstraints] = React.useState<TaskConstraint[]>([]);
   const [conText, setConText] = React.useState("");
   const [conKind, setConKind] = React.useState<TaskConstraint["kind"]>("deny");
@@ -150,7 +150,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.tokensByModel(taskId);
       setModelTokens(resp.models);
     } catch {
-      // 忽略：无 PG 时接口报错，卡片自然为空
+      // Игнорируется: без PG запрос возвращает ошибку, карточка естественным образом остаётся пустой
     }
   }, [taskId]);
 
@@ -159,7 +159,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.taskScope(taskId);
       setScope(resp.scope);
     } catch {
-      // 忽略：无 asset store 时接口 503，范围卡片自然为空
+      // Игнорируется: без asset store запрос возвращает 503, карточка области естественным образом остаётся пустой
     }
   }, [taskId]);
 
@@ -168,7 +168,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.taskGoals(taskId);
       setGoals(resp.goals);
     } catch {
-      // 忽略：瞬时错误，下次轮询重试
+      // Игнорируется: временная ошибка, следующий опрос повторит попытку
     }
   }, [taskId]);
 
@@ -183,7 +183,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       setGoalVuln("");
       await loadGoals();
     } catch (e) {
-      setGoalErr(e instanceof Error ? e.message : "添加失败");
+      setGoalErr(e instanceof Error ? e.message : "Ошибка добавления");
     } finally {
       setGoalBusy(false);
     }
@@ -211,7 +211,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       cancelEditGoal();
       await loadGoals();
     } catch (e) {
-      setGoalErr(e instanceof Error ? e.message : "保存失败");
+      setGoalErr(e instanceof Error ? e.message : "Ошибка сохранения");
     } finally {
       setGoalBusy(false);
     }
@@ -222,7 +222,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     try {
       await api.deleteGoal(taskId, g.id);
     } catch {
-      await loadGoals(); // 删除失败：重新拉取还原
+      await loadGoals(); // Ошибка удаления: перезагружаем, чтобы восстановить состояние
     }
   };
 
@@ -231,7 +231,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.taskConstraints(taskId);
       setConstraints(resp.constraints);
     } catch {
-      // 忽略：瞬时错误，下次轮询重试
+      // Игнорируется: временная ошибка, следующий опрос повторит попытку
     }
   }, [taskId]);
 
@@ -245,7 +245,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       setConText("");
       await loadConstraints();
     } catch (e) {
-      setConErr(e instanceof Error ? e.message : "添加失败");
+      setConErr(e instanceof Error ? e.message : "Ошибка добавления");
     } finally {
       setConBusy(false);
     }
@@ -273,7 +273,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       cancelEditConstraint();
       await loadConstraints();
     } catch (e) {
-      setConErr(e instanceof Error ? e.message : "保存失败");
+      setConErr(e instanceof Error ? e.message : "Ошибка сохранения");
     } finally {
       setConBusy(false);
     }
@@ -284,7 +284,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     try {
       await api.deleteConstraint(taskId, c.id);
     } catch {
-      await loadConstraints(); // 删除失败：重新拉取还原
+      await loadConstraints(); // Ошибка удаления: перезагружаем, чтобы восстановить состояние
     }
   };
 
@@ -298,7 +298,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       setScopeValueInput("");
       await loadScope();
     } catch (e) {
-      setScopeErr(e instanceof Error ? e.message : "添加失败");
+      setScopeErr(e instanceof Error ? e.message : "Ошибка добавления");
     } finally {
       setScopeBusy(false);
     }
@@ -309,7 +309,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     try {
       await api.deleteTaskScope(taskId, row.id);
     } catch {
-      await loadScope(); // 删除失败：重新拉取还原
+      await loadScope(); // Ошибка удаления: перезагружаем, чтобы восстановить состояние
     }
   };
 
@@ -321,20 +321,21 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       return next;
     });
 
-  // 重跑单条：置回 open（乐观更新本地 state，3s 轮询兜底），worker 会重新认领、从头再跑。
+  // Повтор одного интента: возвращаем в open (оптимистичное обновление локального состояния,
+  // подстраховка через опрос каждые 3с), worker заберёт его заново и перезапустит с начала.
   const rerunOne = async (id: string) => {
     markRerun(id, true);
     try {
       await api.rerunIntent(taskId, id);
       setIntents((prev) => prev.map((i) => (i.id === id ? { ...i, state: "open" } : i)));
     } catch {
-      // 失败忽略：下次轮询仍显示 blocked，用户可再点
+      // Сбой игнорируется: при следующем опросе всё ещё будет показан blocked, пользователь может нажать ещё раз
     } finally {
       markRerun(id, false);
     }
   };
 
-  // 批量重跑本任务全部 blocked。
+  // Пакетный повтор всех blocked этой задачи.
   const rerunAll = async () => {
     markRerun("__all__", true);
     try {
@@ -417,7 +418,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
   const blocked = intents.filter((i) => i.state === "blocked");
   const taskFindings = findings.filter((f) => f.task_id === taskId);
   const goalsPct = task?.goals_total ? Math.round(((task.goals_met ?? 0) / task.goals_total) * 100) : 0;
-  // token 合计（跨全部模型），用于卡片头部总览。
+  // Суммарные токены (по всем моделям), для общего обзора в заголовке карточки.
   const tokenTotals = modelTokens.reduce(
     (acc, m) => {
       acc.input += m.input_tokens;
@@ -432,41 +433,42 @@ export function OverviewTab({ taskId }: { taskId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 原始任务描述与目标(创建时填写的),置顶便于随时回看。 */}
+      {/* Исходное описание задачи и цель (заданные при создании), закреплены сверху для удобства просмотра. */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <TargetIcon className="size-4 text-primary" /> 任务描述与目标
+            <TargetIcon className="size-4 text-primary" /> Описание и цель задачи
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <div className="text-xs font-medium text-muted-foreground">描述</div>
+            <div className="text-xs font-medium text-muted-foreground">Описание</div>
             <p className="text-sm whitespace-pre-wrap break-words">{task?.description?.trim() || "—"}</p>
           </div>
           <div className="flex flex-col gap-1.5">
-            <div className="text-xs font-medium text-muted-foreground">目标</div>
+            <div className="text-xs font-medium text-muted-foreground">Цель</div>
             <p className="text-sm whitespace-pre-wrap break-words">{task?.goal?.trim() || "—"}</p>
           </div>
         </CardContent>
       </Card>
-      {/* 目标管理：查看/新增/修改/删除本任务的探索目标。新增与修改会通知规划者并复活任务，
-          删除仅通知规划者（不复活）。目标 = 最终可交付/可核验的结果，不是攻击步骤或侦察动作。 */}
+      {/* Управление целями: просмотр/добавление/изменение/удаление целей разведки этой задачи.
+          Добавление и изменение уведомляют планировщика и возобновляют задачу, удаление только
+          уведомляет планировщика (не возобновляет). Цель = итоговый проверяемый результат, а не шаг атаки или действие разведки. */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ListChecksIcon className="size-4 text-primary" /> 目标管理
+            <ListChecksIcon className="size-4 text-primary" /> Управление целями
             <span className="text-muted-foreground text-xs font-normal">
-              （最终可核验的目标，共 {goals.length} 条；新增/修改会通知规划者并复活任务）
+              (итоговые проверяемые цели, всего {goals.length}; добавление/изменение уведомляет планировщика и возобновляет задачу)
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {/* 新增表单 */}
+          {/* форма добавления */}
           <div className="flex flex-wrap items-center gap-2">
             <Input
               className="h-7 min-w-56 flex-1 text-sm"
-              placeholder="新增目标，如『拿到管理员账号的越权访问』"
+              placeholder="Новая цель, например «Получить несанкционированный доступ к аккаунту администратора»"
               value={goalText}
               onChange={(e) => setGoalText(e.target.value)}
               onKeyDown={(e) => {
@@ -476,7 +478,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
             />
             <Input
               className="h-7 w-32 text-sm"
-              placeholder="漏洞类(可选)"
+              placeholder="Тип уязвимости (опц.)"
               value={goalVuln}
               onChange={(e) => setGoalVuln(e.target.value)}
               onKeyDown={(e) => {
@@ -485,11 +487,11 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               disabled={goalBusy}
             />
             <Button size="sm" variant="outline" disabled={goalBusy || !goalText.trim()} onClick={() => void addGoal()}>
-              <PlusIcon className="size-3.5" /> 添加
+              <PlusIcon className="size-3.5" /> Добавить
             </Button>
             {goalErr && <span className="text-xs text-red-500">{goalErr}</span>}
           </div>
-          {/* 目标列表 */}
+          {/* список целей */}
           {goals.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {goals.map((g) =>
@@ -508,7 +510,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                     />
                     <Input
                       className="h-7 w-32 text-sm"
-                      placeholder="漏洞类(可选)"
+                      placeholder="Тип уязвимости (опц.)"
                       value={editVuln}
                       onChange={(e) => setEditVuln(e.target.value)}
                       onKeyDown={(e) => {
@@ -568,36 +570,38 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               )}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">暂无目标，添加后规划者会据此派发探索意图并判定达成。</p>
+            <p className="text-muted-foreground text-sm">Пока нет целей, после добавления планировщик будет на их основе распределять интенты разведки и определять достижение.</p>
           )}
         </CardContent>
       </Card>
-      {/* 操作约束管理：allow=允许 / deny=禁止。约束会在下一轮规划时注入 planner/worker 的系统
-          提示以框定探索边界（注入范围可在 系统设置 里按 planner/worker 开关）。改动不即时打断，
-          下一轮规划自然读到。 */}
+      {/* Управление операционными ограничениями: allow = разрешено / deny = запрещено. Ограничения
+          внедряются в системный промпт planner/worker на следующем цикле планирования, задавая
+          границы разведки (область внедрения настраивается в системных настройках отдельно для
+          planner/worker). Изменение не прерывает текущий цикл немедленно, оно естественным образом
+          считывается на следующем. */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldAlertIcon className="size-4 text-amber-500" /> 操作约束
+            <ShieldAlertIcon className="size-4 text-amber-500" /> Операционные ограничения
             <span className="text-muted-foreground text-xs font-normal">
-              （框定 planner/worker 的探索边界，共 {constraints.length} 条；改动下一轮规划生效）
+              (задают границы разведки для planner/worker, всего {constraints.length}; изменения применяются со следующего цикла планирования)
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {/* 新增表单 */}
+          {/* форма добавления */}
           <div className="flex flex-wrap items-center gap-2">
             <NativeSelect
               size="sm"
               value={conKind}
               onChange={(e) => setConKind(e.target.value as TaskConstraint["kind"])}
             >
-              <NativeSelectOption value="deny">禁止</NativeSelectOption>
-              <NativeSelectOption value="allow">允许</NativeSelectOption>
+              <NativeSelectOption value="deny">Запретить</NativeSelectOption>
+              <NativeSelectOption value="allow">Разрешить</NativeSelectOption>
             </NativeSelect>
             <Input
               className="h-7 min-w-56 flex-1 text-sm"
-              placeholder="一条操作约束，如『仅测当前端口，不扫其他端口』"
+              placeholder="Одно операционное ограничение, например «тестировать только текущий порт, не сканировать остальные»"
               value={conText}
               onChange={(e) => setConText(e.target.value)}
               onKeyDown={(e) => {
@@ -611,11 +615,11 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               disabled={conBusy || !conText.trim()}
               onClick={() => void addConstraint()}
             >
-              <PlusIcon className="size-3.5" /> 添加
+              <PlusIcon className="size-3.5" /> Добавить
             </Button>
             {conErr && <span className="text-xs text-red-500">{conErr}</span>}
           </div>
-          {/* 约束列表 */}
+          {/* список ограничений */}
           {constraints.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {constraints.map((c) =>
@@ -626,8 +630,8 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                       value={editConKind}
                       onChange={(e) => setEditConKind(e.target.value as TaskConstraint["kind"])}
                     >
-                      <NativeSelectOption value="deny">禁止</NativeSelectOption>
-                      <NativeSelectOption value="allow">允许</NativeSelectOption>
+                      <NativeSelectOption value="deny">Запретить</NativeSelectOption>
+                      <NativeSelectOption value="allow">Разрешить</NativeSelectOption>
                     </NativeSelect>
                     <Input
                       className="h-7 min-w-56 flex-1 text-sm"
@@ -668,7 +672,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                           : "bg-red-500/15 text-red-600 dark:text-red-400"
                       }`}
                     >
-                      {c.kind === "allow" ? "允许" : "禁止"}
+                      {c.kind === "allow" ? "Разрешено" : "Запрещено"}
                     </span>
                     <span className="min-w-0 flex-1 break-words">{c.text}</span>
                     <Button
@@ -695,7 +699,9 @@ export function OverviewTab({ taskId }: { taskId: string }) {
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">
-              暂无操作约束。建任务时会自动从描述/目标抽取；也可在此手动增删改，用来框定「允许/禁止做哪些操作」。
+              Пока нет операционных ограничений. При создании задачи они автоматически извлекаются из
+              описания/цели; здесь также можно добавлять, удалять и изменять их вручную, задавая «какие
+              действия разрешены/запрещены».
             </p>
           )}
         </CardContent>
@@ -705,8 +711,8 @@ export function OverviewTab({ taskId }: { taskId: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <TargetIcon className="size-4 text-emerald-500" /> 资产测试覆盖度
-              <span className="text-muted-foreground text-xs font-normal">（粗估，仅供参考）</span>
+              <TargetIcon className="size-4 text-emerald-500" /> Охват тестирования активов
+              <span className="text-muted-foreground text-xs font-normal"> (приблизительная оценка, только для справки)</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -715,7 +721,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                 {coverage.pct != null ? Math.round(coverage.pct * 100) + "%" : "—"}
               </span>
               <span className="text-muted-foreground text-sm">
-                已测 {coverage.tested} / 范围内 {coverage.denominator}
+                Протестировано {coverage.tested} / в области {coverage.denominator}
               </span>
             </div>
             {coverage.pct != null && <Progress value={Math.round(coverage.pct * 100)} />}
@@ -734,51 +740,51 @@ export function OverviewTab({ taskId }: { taskId: string }) {
           </CardContent>
         </Card>
       )}
-      {/* LLM Token 用量：按模型分组，数据来自 llm_records（需开启 LLM 录制）。 */}
+      {/* Расход токенов LLM: группировка по моделям, данные из llm_records (требуется включённая запись LLM). */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <CoinsIcon className="size-4 text-amber-500" /> LLM Token 用量
+            <CoinsIcon className="size-4 text-amber-500" /> Расход токенов LLM
             <span className="text-muted-foreground text-xs font-normal">
-              （按模型统计{tokenTotals.calls > 0 ? `，共 ${tokenTotals.calls} 次调用` : ""}）
+              (статистика по моделям{tokenTotals.calls > 0 ? `, всего вызовов: ${tokenTotals.calls}` : ""})
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {modelTokens.length > 0 ? (
             <>
-              {/* 合计总览 */}
+              {/* общий итог */}
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">输入 </span>
+                  <span className="text-muted-foreground">Вход </span>
                   <span className="font-semibold">{fmtTokens(tokenTotals.input)}</span>
                 </span>
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">输出 </span>
+                  <span className="text-muted-foreground">Выход </span>
                   <span className="font-semibold">{fmtTokens(tokenTotals.output)}</span>
                 </span>
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">缓存读 </span>
+                  <span className="text-muted-foreground">Чтение кеша </span>
                   <span className="font-semibold">{fmtTokens(tokenTotals.cacheRead)}</span>
                 </span>
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">缓存命中率 </span>
+                  <span className="text-muted-foreground">Процент попаданий в кеш </span>
                   <span className="font-semibold text-emerald-500">
                     {cacheHitRate(tokenTotals.cacheRead, tokenTotals.input)}
                   </span>
                 </span>
               </div>
-              {/* 按模型明细表 */}
+              {/* таблица по моделям */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-muted-foreground border-b text-left text-xs">
-                      <th className="py-1.5 pr-3 font-medium">模型</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">调用</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">输入</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">输出</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">缓存读</th>
-                      <th className="py-1.5 text-right font-medium">命中率</th>
+                      <th className="py-1.5 pr-3 font-medium">Модель</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">Вызовов</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">Вход</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">Выход</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">Чтение кеша</th>
+                      <th className="py-1.5 text-right font-medium">Попадания</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -801,48 +807,48 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               </div>
             </>
           ) : (
-            <p className="text-muted-foreground text-sm">暂无 LLM 用量（任务尚未产生调用，或记录仍在写入）。</p>
+            <p className="text-muted-foreground text-sm">Пока нет расхода LLM (задача ещё не произвела вызовов, либо записи ещё записываются).</p>
           )}
         </CardContent>
       </Card>
-      {/* 测试范围：覆盖度分母 + 授权边界，可手动增删。 */}
+      {/* Тестовая область: знаменатель охвата + границы авторизации, можно добавлять/удалять вручную. */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheckIcon className="size-4 text-emerald-500" /> 测试范围
+            <ShieldCheckIcon className="size-4 text-emerald-500" /> Тестовая область
             <span className="text-muted-foreground text-xs font-normal">
-              （覆盖度分母 + 授权边界，共 {scope.length} 条）
+              (знаменатель охвата + границы авторизации, всего {scope.length})
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {/* 新增表单 */}
+          {/* форма добавления */}
           <div className="flex flex-wrap items-center gap-2">
             <NativeSelect
               size="sm"
               value={scopeKind}
               onChange={(e) => setScopeKind(e.target.value as TaskScopeRow["kind"])}
             >
-              <NativeSelectOption value="root_domain">根域名</NativeSelectOption>
-              <NativeSelectOption value="subdomain">子域名</NativeSelectOption>
+              <NativeSelectOption value="root_domain">Корневой домен</NativeSelectOption>
+              <NativeSelectOption value="subdomain">Поддомен</NativeSelectOption>
               <NativeSelectOption value="ip">IP</NativeSelectOption>
-              <NativeSelectOption value="cidr">网段</NativeSelectOption>
+              <NativeSelectOption value="cidr">Подсеть</NativeSelectOption>
               <NativeSelectOption value="icp">ICP</NativeSelectOption>
-              <NativeSelectOption value="keyword">关键词</NativeSelectOption>
-              <NativeSelectOption value="company">公司</NativeSelectOption>
+              <NativeSelectOption value="keyword">Ключевое слово</NativeSelectOption>
+              <NativeSelectOption value="company">Компания</NativeSelectOption>
             </NativeSelect>
             <Input
               className="h-7 w-56 text-sm"
               placeholder={
                 scopeKind === "company"
-                  ? "公司名或 id"
+                  ? "Название компании или id"
                   : scopeKind === "ip" || scopeKind === "cidr"
-                    ? "如 10.0.0.1 或 10.0.0.0/24"
+                    ? "например, 10.0.0.1 или 10.0.0.0/24"
                     : scopeKind === "icp"
-                      ? "如 京ICP备12345678号-1"
+                      ? "например, 京ICP备12345678号-1"
                       : scopeKind === "keyword"
-                        ? "如 企业名称关键词"
-                        : "如 example.com"
+                        ? "например, ключевое слово из названия компании"
+                        : "например, example.com"
               }
               value={scopeValueInput}
               onChange={(e) => setScopeValueInput(e.target.value)}
@@ -857,11 +863,11 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               disabled={scopeBusy || !scopeValueInput.trim()}
               onClick={() => void addScope()}
             >
-              <PlusIcon className="size-3.5" /> 添加
+              <PlusIcon className="size-3.5" /> Добавить
             </Button>
             {scopeErr && <span className="text-xs text-red-500">{scopeErr}</span>}
           </div>
-          {/* 范围列表 */}
+          {/* список областей */}
           {scope.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {scope.map((row) => (
@@ -881,13 +887,13 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                       <Trash2Icon className="size-3.5 text-red-500" />
                     </Button>
                   ) : (
-                    <span className="text-muted-foreground shrink-0 text-xs">继承</span>
+                    <span className="text-muted-foreground shrink-0 text-xs">Унаследовано</span>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">暂无测试范围，添加后可作为资产覆盖度的分母。</p>
+            <p className="text-muted-foreground text-sm">Пока нет тестовой области, после добавления она станет знаменателем для охвата активов.</p>
           )}
         </CardContent>
       </Card>
@@ -895,12 +901,12 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ActivityIcon className="size-4 text-blue-500" /> 心跳
+            <ActivityIcon className="size-4 text-blue-500" /> Пульс
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <div className="text-xs text-muted-foreground">引擎态</div>
+            <div className="text-xs text-muted-foreground">Состояние движка</div>
             <StatusBadge
               domain="engine"
               value={stats?.engine_mode ?? task?.engine_mode ?? "idle"}
@@ -909,28 +915,28 @@ export function OverviewTab({ taskId }: { taskId: string }) {
             />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">运行中 Worker</div>
+            <div className="text-xs text-muted-foreground">Выполняющихся Worker</div>
             <div className="mt-1 text-lg font-semibold tabular-nums">{running.length}</div>
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">最近活动</div>
+            <div className="text-xs text-muted-foreground">Последняя активность</div>
             <div className="mt-1 inline-flex items-center gap-1 text-sm">
               <ClockIcon className="size-3.5" />
-              {task?.last_activity ? new Date(task.last_activity).toLocaleTimeString("zh-CN") : "—"}
+              {task?.last_activity ? new Date(task.last_activity).toLocaleTimeString("ru-RU") : "—"}
             </div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">
-              目标 {task?.goals_met ?? 0}/{task?.goals_total ?? 0}
+              Цели {task?.goals_met ?? 0}/{task?.goals_total ?? 0}
             </div>
             <Progress value={goalsPct} className="mt-2" />
           </div>
           {task?.completed_unix && task.completed_unix > 0 ? (
             <div>
-              <div className="text-xs text-muted-foreground">完成时间</div>
+              <div className="text-xs text-muted-foreground">Время завершения</div>
               <div className="mt-1 inline-flex items-center gap-1 text-sm">
                 <ClockIcon className="size-3.5" />
-                {new Date(task.completed_unix * 1000).toLocaleString("zh-CN")}
+                {new Date(task.completed_unix * 1000).toLocaleString("ru-RU")}
               </div>
             </div>
           ) : null}
@@ -942,7 +948,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <TargetIcon className="size-4" /> 进行中意图
+              <TargetIcon className="size-4" /> Текущие интенты
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -952,32 +958,32 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                 <span className="min-w-0 flex-1 truncate">{i.payload}</span>
               </div>
             ))}
-            {running.length === 0 && <p className="text-sm text-muted-foreground">暂无进行中意图</p>}
+            {running.length === 0 && <p className="text-sm text-muted-foreground">Пока нет текущих интентов</p>}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <AlertTriangleIcon className="size-4 text-amber-500" /> 需要关注
+              <AlertTriangleIcon className="size-4 text-amber-500" /> Требует внимания
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <div className="text-2xl font-semibold tabular-nums text-red-600">{taskFindings.length}</div>
-              <div className="text-xs text-muted-foreground">确认漏洞</div>
+              <div className="text-xs text-muted-foreground">Подтверждённых находок</div>
             </div>
             <div>
               <div className="text-2xl font-semibold tabular-nums text-blue-600">{running.length}</div>
-              <div className="text-xs text-muted-foreground">执行中</div>
+              <div className="text-xs text-muted-foreground">Выполняется</div>
             </div>
             <div>
               <div className="text-2xl font-semibold tabular-nums">{open.length}</div>
-              <div className="text-xs text-muted-foreground">frontier 待领</div>
+              <div className="text-xs text-muted-foreground">В ожидании (frontier)</div>
             </div>
             <div>
               <div className="text-2xl font-semibold tabular-nums text-red-600">{blocked.length}</div>
-              <div className="text-xs text-muted-foreground">被拦意图</div>
+              <div className="text-xs text-muted-foreground">Заблокированных интентов</div>
             </div>
           </CardContent>
         </Card>
@@ -985,7 +991,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <BugIcon className="size-4 text-red-500" /> 最近发现
+              <BugIcon className="size-4 text-red-500" /> Недавние находки
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -995,23 +1001,25 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                 <span className="min-w-0 flex-1 truncate">{f.summary}</span>
               </div>
             ))}
-            {taskFindings.length === 0 && <p className="text-sm text-muted-foreground">暂无发现</p>}
+            {taskFindings.length === 0 && <p className="text-sm text-muted-foreground">Пока нет находок</p>}
           </CardContent>
         </Card>
       </div>
 
-      {/* Blocked intents — 出错/被拦(如 LLM 网络问题)的意图，可一键重跑：置回 open，
-          worker 会重新认领、从头再跑（已写回图谱的数据保留）；任务若已终态/暂停会自动复活。 */}
+      {/* Blocked intents — интенты со сбоем/заблокированные (например, из-за сетевых проблем LLM),
+          можно перезапустить одним нажатием: возвращаются в open, worker заберёт их заново и
+          перезапустит с начала (данные, уже записанные в граф, сохраняются); если задача в финальном
+          статусе/на паузе, она автоматически возобновляется. */}
       {blocked.length > 0 && (
         <Card className="border-red-500/30">
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="flex items-center gap-2 text-sm">
-              <AlertTriangleIcon className="size-4 text-red-500" /> 被拦/出错意图
-              <span className="text-xs font-normal text-muted-foreground">（共 {blocked.length} 条，可重跑）</span>
+              <AlertTriangleIcon className="size-4 text-red-500" /> Заблокированные/со сбоем интенты
+              <span className="text-xs font-normal text-muted-foreground"> (всего {blocked.length}, можно перезапустить)</span>
             </CardTitle>
             <Button size="sm" variant="outline" disabled={rerunning.has("__all__")} onClick={() => void rerunAll()}>
               <RefreshCwIcon className={`size-3.5 ${rerunning.has("__all__") ? "animate-spin" : ""}`} />
-              全部重跑
+              Перезапустить все
             </Button>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -1027,13 +1035,13 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                   onClick={() => void rerunOne(i.id)}
                 >
                   <RefreshCwIcon className={`size-3 ${rerunning.has(i.id) ? "animate-spin" : ""}`} />
-                  重跑
+                  Перезапустить
                 </Button>
               </div>
             ))}
             {blocked.length > 20 && (
               <p className="text-xs text-muted-foreground">
-                仅显示前 20 条，点「全部重跑」处理剩余 {blocked.length - 20} 条。
+                Показаны только первые 20, нажмите «Перезапустить все», чтобы обработать оставшиеся {blocked.length - 20}.
               </p>
             )}
           </CardContent>
@@ -1042,30 +1050,31 @@ export function OverviewTab({ taskId }: { taskId: string }) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <StatCard label="待领意图" value={open.length} icon={ShieldCheckIcon} sub="frontier 开放" />
-        <StatCard label="确认发现" value={taskFindings.length} icon={BugIcon} sub="本任务" />
-        <StatCard label="意图总数" value={intents.length} icon={AlertTriangleIcon} sub="本任务全部意图" />
+        <StatCard label="Интентов в ожидании" value={open.length} icon={ShieldCheckIcon} sub="открыты (frontier)" />
+        <StatCard label="Подтверждённых находок" value={taskFindings.length} icon={BugIcon} sub="в этой задаче" />
+        <StatCard label="Всего интентов" value={intents.length} icon={AlertTriangleIcon} sub="все интенты этой задачи" />
       </div>
     </div>
   );
 }
 
 const TASK_RULE_KIND_OPTIONS: { value: AssetInterceptKind; label: string; placeholder: string }[] = [
-  { value: "exact_domain", label: "域名(全等)", placeholder: "example.gov.cn" },
-  { value: "exact_ip", label: "IP(全等)", placeholder: "203.0.113.10" },
-  { value: "exact_url", label: "URL(全等)", placeholder: "https://example.com/login" },
-  { value: "fuzzy_domain", label: "域名(模糊)", placeholder: ".gov.cn" },
-  { value: "fuzzy_ip", label: "IP(模糊)", placeholder: "203.0.113." },
-  { value: "fuzzy_url", label: "URL(模糊)", placeholder: "/admin" },
-  { value: "cidr", label: "CIDR 网段", placeholder: "192.168.0.0/16" },
+  { value: "exact_domain", label: "Домен (точное совпадение)", placeholder: "example.gov.cn" },
+  { value: "exact_ip", label: "IP (точное совпадение)", placeholder: "203.0.113.10" },
+  { value: "exact_url", label: "URL (точное совпадение)", placeholder: "https://example.com/login" },
+  { value: "fuzzy_domain", label: "Домен (нечёткое совпадение)", placeholder: ".gov.cn" },
+  { value: "fuzzy_ip", label: "IP (нечёткое совпадение)", placeholder: "203.0.113." },
+  { value: "fuzzy_url", label: "URL (нечёткое совпадение)", placeholder: "/admin" },
+  { value: "cidr", label: "Подсеть CIDR", placeholder: "192.168.0.0/16" },
 ];
 
 const TASK_RULE_KIND_LABEL: Record<AssetInterceptKind, string> = Object.fromEntries(
   TASK_RULE_KIND_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<AssetInterceptKind, string>;
 
-// TaskInterceptRulesCard 在任务详情总览里管理「任务级资产拦截 / 允许规则」：
-// 列表 + 新增 + 行内编辑 + 删除 + 启用开关。规则仅本任务生效，不进全局表。
+// TaskInterceptRulesCard управляет «правилами перехвата/разрешения активов на уровне задачи»
+// в обзоре деталей задачи: список + добавление + строчное редактирование + удаление +
+// переключатель включения. Правила действуют только для этой задачи, в глобальную таблицу не попадают.
 function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
   const [rules, setRules] = React.useState<AssetInterceptRule[]>([]);
   const [busy, setBusy] = React.useState(false);
@@ -1084,7 +1093,7 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
     try {
       setRules(await api.taskInterceptRules(taskId));
     } catch {
-      // 忽略瞬时错误
+      // Игнорируем временные ошибки
     }
   }, [taskId]);
 
@@ -1168,18 +1177,18 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheckIcon className="size-4 text-sky-500" /> 任务级资产拦截 / 允许
+          <ShieldCheckIcon className="size-4 text-sky-500" /> Перехват / разрешение активов на уровне задачи
           <span className="text-muted-foreground text-xs font-normal">
-            （仅本任务生效，不进全局；先拦截后允许，共 {rules.length} 条）
+            (действует только для этой задачи, не попадает в глобальные правила; сначала перехват, потом разрешение, всего {rules.length})
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {/* 新增表单 */}
+        {/* форма добавления */}
         <div className="flex flex-wrap items-center gap-2">
           <NativeSelect size="sm" value={newAction} onChange={(e) => setNewAction(e.target.value as "block" | "allow")}>
-            <NativeSelectOption value="block">拦截</NativeSelectOption>
-            <NativeSelectOption value="allow">允许</NativeSelectOption>
+            <NativeSelectOption value="block">Перехват</NativeSelectOption>
+            <NativeSelectOption value="allow">Разрешение</NativeSelectOption>
           </NativeSelect>
           <NativeSelect size="sm" value={newKind} onChange={(e) => setNewKind(e.target.value as AssetInterceptKind)}>
             {TASK_RULE_KIND_OPTIONS.map((o) => (
@@ -1200,17 +1209,17 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
           />
           <Input
             className="h-7 w-36 text-sm"
-            placeholder="备注(可选)"
+            placeholder="Примечание (опц.)"
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
             disabled={busy}
           />
           <Button size="sm" variant="outline" disabled={busy || !newPattern.trim()} onClick={() => void add()}>
-            <PlusIcon className="size-3.5" /> 添加
+            <PlusIcon className="size-3.5" /> Добавить
           </Button>
           {err && <span className="text-xs text-red-500">{err}</span>}
         </div>
-        {/* 规则列表 */}
+        {/* список правил */}
         {rules.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             {rules.map((r) =>
@@ -1221,8 +1230,8 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
                     value={editAction}
                     onChange={(e) => setEditAction(e.target.value as "block" | "allow")}
                   >
-                    <NativeSelectOption value="block">拦截</NativeSelectOption>
-                    <NativeSelectOption value="allow">允许</NativeSelectOption>
+                    <NativeSelectOption value="block">Перехват</NativeSelectOption>
+                    <NativeSelectOption value="allow">Разрешение</NativeSelectOption>
                   </NativeSelect>
                   <NativeSelect
                     size="sm"
@@ -1248,7 +1257,7 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
                   />
                   <Input
                     className="h-7 w-36 text-sm"
-                    placeholder="备注(可选)"
+                    placeholder="Примечание (опц.)"
                     value={editNote}
                     onChange={(e) => setEditNote(e.target.value)}
                     disabled={busy}
@@ -1281,7 +1290,7 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
                         : "bg-red-500/15 text-red-600 dark:text-red-400"
                     }`}
                   >
-                    {r.action === "allow" ? "允许" : "拦截"}
+                    {r.action === "allow" ? "Разрешено" : "Перехват"}
                   </span>
                   <span className="text-muted-foreground shrink-0 text-xs">{TASK_RULE_KIND_LABEL[r.kind]}</span>
                   <code className="bg-muted min-w-0 flex-1 truncate rounded px-1.5 py-0.5 text-xs">{r.pattern}</code>
@@ -1313,7 +1322,9 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
-            暂无任务级规则。「拦截」命中即禁止测试；「允许」为白名单——配置后本任务只允许命中允许规则的资产（未配置则不启用白名单）。
+            Пока нет правил на уровне задачи. «Перехват» при совпадении запрещает тестирование; «Разрешение» —
+            это белый список: при настройке в этой задаче тестируются только активы, совпавшие с правилом
+            разрешения (если не настроено — белый список не действует).
           </p>
         )}
       </CardContent>
