@@ -1514,7 +1514,7 @@ func (t *Traffic) RecoverHostDeleteStages(archiveCommitted func(int64, int64) (b
 			continue
 		}
 		if journal.Version != 1 {
-			errs = append(errs, fmt.Errorf("версия %d журнала временного хранения трафика %s не поддерживается", stageDir, journal.Version))
+			errs = append(errs, fmt.Errorf("журнал временного хранения трафика %s: версия %d не поддерживается", stageDir, journal.Version))
 			continue
 		}
 		moves := make([]stagedTrafficPath, 0, len(journal.Moves))

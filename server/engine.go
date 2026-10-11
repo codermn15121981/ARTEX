@@ -457,10 +457,10 @@ func (e *Engine) ControlWork(ctx context.Context, intentID int64, action string)
 		return err
 	case <-ctx.Done():
 		e.releaseWorkControl(intentID, run, action)
-		return fmt.Errorf("ожидание завершения %s намерения %d: %w", intentID, action, ctx.Err())
+		return fmt.Errorf("ожидание завершения намерения %d (%s): %w", intentID, action, ctx.Err())
 	case <-timer.C:
 		e.releaseWorkControl(intentID, run, action)
-		return fmt.Errorf("ожидание завершения %s намерения %d: %w", intentID, action, context.DeadlineExceeded)
+		return fmt.Errorf("ожидание завершения намерения %d (%s): %w", intentID, action, context.DeadlineExceeded)
 	}
 }
 
