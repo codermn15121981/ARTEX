@@ -136,14 +136,14 @@ func SkillDir() string {
 // DSN came from (for startup logging).
 func PostgresDSN() (dsn, source string, err error) {
 	if v := strings.TrimSpace(os.Getenv("ARTEX_PG_DSN")); v != "" {
-		return v, "环境变量 ARTEX_PG_DSN", nil
+		return v, "переменная окружения ARTEX_PG_DSN", nil
 	}
 	db := Load().Database
 	if d := strings.TrimSpace(db.DSN); d != "" {
-		return d, "配置文件 " + Path() + " (database.dsn)", nil
+		return d, "файл конфигурации " + Path() + " (database.dsn)", nil
 	}
 	if db.Host != "" || db.DBName != "" || db.User != "" {
-		return db.buildDSN(), "配置文件 " + Path() + " (database 字段)", nil
+		return db.buildDSN(), "файл конфигурации " + Path() + " (поле database)", nil
 	}
 	return "", "", fmt.Errorf("конфигурация базы данных не найдена: переменная окружения ARTEX_PG_DSN не задана, а файл конфигурации %s не содержит database (dsn или host/user/dbname). Создайте этот файл конфигурации или задайте переменную окружения и повторите попытку", Path())
 }
