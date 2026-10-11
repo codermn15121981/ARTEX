@@ -58,7 +58,7 @@ func parseChatMentions(message string) ([]chatMentionRef, error) {
 func (s *Server) searchChatMentions(w http.ResponseWriter, r *http.Request) {
 	kind, query := r.URL.Query().Get("kind"), strings.TrimSpace(r.URL.Query().Get("q"))
 	if (kind != "" && !db.ValidChatMentionKind(kind)) || utf8.RuneCountInString(query) > 200 {
-		writeErr(w, 400, "引用类型无效或搜索关键词超过 200 字")
+		writeErr(w, 400, "недопустимый тип упоминания или поисковый запрос длиннее 200 символов")
 		return
 	}
 	pg := s.pg(w)

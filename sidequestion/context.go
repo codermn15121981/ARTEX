@@ -115,7 +115,7 @@ func (b *contextBuilder) summarize(ctx context.Context, prior, text string) (str
 			return "", ctx.Err()
 		}
 		if err != nil {
-			return "", fmt.Errorf("旁路摘要失败：%w", err)
+			return "", fmt.Errorf("не удалось создать сводку для побочного вопроса: %w", err)
 		}
 		result := strings.TrimSpace(msg.Text())
 		if result == "" || stop == "max_tokens" || stop == "length" || len(msg.ToolUses()) > 0 {

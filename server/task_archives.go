@@ -449,7 +449,7 @@ func (s *Server) listTaskArchives(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getTaskArchive(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathInt(r, "id")
 	if !ok {
-		writeErr(w, 400, "归档 id 无效")
+		writeErr(w, 400, "недопустимый id архива")
 		return
 	}
 	item, err := s.m.pg.GetTaskArchive(id)
@@ -458,7 +458,7 @@ func (s *Server) getTaskArchive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if item == nil {
-		writeErr(w, 404, "归档不存在")
+		writeErr(w, 404, "архив не существует")
 		return
 	}
 	writeJSON(w, 200, item)
@@ -467,7 +467,7 @@ func (s *Server) getTaskArchive(w http.ResponseWriter, r *http.Request) {
 func (s *Server) queueTaskArchive(w http.ResponseWriter, r *http.Request) {
 	id, ok := canonicalTaskID(r.PathValue("id"))
 	if !ok {
-		writeErr(w, 400, "任务 id 无效")
+		writeErr(w, 400, "недопустимый id задачи")
 		return
 	}
 	numeric, _ := strconv.ParseInt(id, 10, 64)
@@ -483,7 +483,7 @@ func (s *Server) queueTaskArchive(w http.ResponseWriter, r *http.Request) {
 func (s *Server) queueTaskArchiveRestore(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathInt(r, "id")
 	if !ok {
-		writeErr(w, 400, "归档 id 无效")
+		writeErr(w, 400, "недопустимый id архива")
 		return
 	}
 	item, err := s.m.pg.QueueTaskArchiveRestore(id)
@@ -498,7 +498,7 @@ func (s *Server) queueTaskArchiveRestore(w http.ResponseWriter, r *http.Request)
 func (s *Server) queueTaskArchiveDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathInt(r, "id")
 	if !ok {
-		writeErr(w, 400, "归档 id 无效")
+		writeErr(w, 400, "недопустимый id архива")
 		return
 	}
 	item, err := s.m.pg.QueueTaskArchiveDelete(id)
@@ -518,11 +518,11 @@ func (s *Server) queueTaskArchivesBatch(w http.ResponseWriter, r *http.Request) 
 	}
 	parsed := normalizeBatchTaskIDs(request.TaskIDs)
 	if len(parsed) == 0 {
-		writeErr(w, 400, "task_ids 不能为空")
+		writeErr(w, 400, "task_ids не может быть пустым")
 		return
 	}
 	if len(parsed) > 100 {
-		writeErr(w, 400, "一次最多处理 100 个任务")
+		writeErr(w, 400, "за один раз можно обработать не более 100 задач")
 		return
 	}
 	ids := make([]string, 0, len(parsed))
@@ -592,16 +592,16 @@ func (s *Server) deleteTaskArchivesBatch(w http.ResponseWriter, r *http.Request)
 
 func normalizeArchiveIDs(ids []int64) ([]int64, error) {
 	if len(ids) == 0 {
-		return nil, errors.New("archive_ids 不能为空")
+		return nil, errors.New("archive_ids не может быть пустым")
 	}
 	if len(ids) > 100 {
-		return nil, errors.New("一次最多处理 100 个归档")
+		return nil, errors.New("за один раз можно обработать не более 100 архивов")
 	}
 	seen := map[int64]bool{}
 	out := make([]int64, 0, len(ids))
 	for _, id := range ids {
 		if id <= 0 {
-			return nil, fmt.Errorf("归档 id %d 无效", id)
+			return nil, fmt.Errorf("недопустимый id архива %d", id)
 		}
 		if !seen[id] {
 			seen[id] = true

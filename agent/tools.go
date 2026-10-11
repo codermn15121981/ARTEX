@@ -1549,14 +1549,14 @@ type constraintItem struct {
 func (t *ToolSet) addOneConstraint(it constraintItem) (int64, error) {
 	text := strings.TrimSpace(it.Text)
 	if text == "" {
-		return 0, fmt.Errorf("text 不能为空")
+		return 0, fmt.Errorf("text не может быть пустым")
 	}
 	kind := strings.TrimSpace(strings.ToLower(it.Type))
 	if kind == "" {
 		kind = "deny" // 默认按禁止处理:未标注类型时更保守
 	}
 	if kind != "allow" && kind != "deny" {
-		return 0, fmt.Errorf("type 必须是 allow 或 deny")
+		return 0, fmt.Errorf("type должен быть allow или deny")
 	}
 	return t.ts.AddConstraint(kind, text, t.worker)
 }

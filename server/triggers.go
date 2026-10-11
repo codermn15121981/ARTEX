@@ -56,7 +56,7 @@ func (s *Server) pgCreateTrigger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.Builtin {
-		writeErr(w, 400, "触发器仅支持自定义 agent")
+		writeErr(w, 400, "триггеры поддерживаются только для пользовательских агентов")
 		return
 	}
 	var req triggerReq

@@ -331,7 +331,7 @@ func (m *Manager) Workers() int {
 // SetWorkers persists the concurrent work-agent count. Values <=0 are rejected.
 func (m *Manager) SetWorkers(n int) error {
 	if n <= 0 {
-		return fmt.Errorf("workers 必须 >0")
+		return fmt.Errorf("workers должно быть >0")
 	}
 	return m.pg.SetSetting(settingWorkers, strconv.Itoa(n))
 }
@@ -358,7 +358,7 @@ func NewManager(dir, proxyAddr string) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[pg] 数据库配置来源: %s", source)
+	log.Printf("[pg] источник конфигурации базы данных: %s", source)
 	pg, err := pgdb.Open(dsn)
 	if err != nil {
 		return nil, err
@@ -436,7 +436,7 @@ func NewManager(dir, proxyAddr string) (*Manager, error) {
 	}
 	if m.traffic != nil {
 		if err := m.traffic.SetUpstreamProxy(m.globalProxy); err != nil {
-			log.Printf("[proxy] 全局代理 %q 无效，已忽略: %v", m.globalProxy, err)
+			log.Printf("[proxy] глобальный прокси %q недействителен, игнорируется: %v", m.globalProxy, err)
 		}
 	}
 	m.enrich = enrich.New(m.assets, m.ProxyAddr, 4)
@@ -640,7 +640,7 @@ const browserMCPName = "browser"
 func (m *Manager) syncBrowserMCPProxy() {
 	servers, err := m.pg.ListMCP()
 	if err != nil {
-		log.Printf("[mcp] browser 代理同步: 读取 MCP 列表失败: %v", err)
+		log.Printf("[mcp] синхронизация прокси browser: не удалось прочитать список MCP: %v", err)
 		return
 	}
 	var srv *pgdb.MCPServer
@@ -669,13 +669,13 @@ func (m *Manager) syncBrowserMCPProxy() {
 	srv.Args = encodeJSON(args)
 	srv.Env = encodeJSON(env)
 	if _, err := m.pg.SaveMCP(srv); err != nil {
-		log.Printf("[mcp] browser 代理同步失败: %v", err)
+		log.Printf("[mcp] ошибка синхронизации прокси browser: %v", err)
 		return
 	}
 	if proxy != "" {
-		log.Printf("[mcp] browser MCP 已挂捕获代理 %s (CA %s)", proxy, cert)
+		log.Printf("[mcp] browser MCP подключён к прокси перехвата %s (CA %s)", proxy, cert)
 	} else {
-		log.Printf("[mcp] browser MCP 已移除捕获代理配置")
+		log.Printf("[mcp] конфигурация прокси перехвата для browser MCP удалена")
 	}
 }
 

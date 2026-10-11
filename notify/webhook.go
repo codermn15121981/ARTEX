@@ -86,14 +86,14 @@ func (webhookChannel) Validate(cfg map[string]any) error {
 		return errors.New("缺少目标 URL")
 	}
 	if err := validateHTTPURL(raw); err != nil {
-		return fmt.Errorf("目标 URL 无效: %w", err)
+		return fmt.Errorf("недействительный целевой URL: %w", err)
 	}
 	if m := strings.ToUpper(cfgString(cfg, "method")); m != "" && m != http.MethodGet && m != http.MethodPost && m != http.MethodPut && m != http.MethodPatch {
-		return fmt.Errorf("不支持的方法 %s（可用 GET/POST/PUT/PATCH）", m)
+		return fmt.Errorf("неподдерживаемый метод %s (доступны GET/POST/PUT/PATCH)", m)
 	}
 	if tpl := cfgString(cfg, "body_template"); tpl != "" {
 		if _, err := parseWebhookTemplate(tpl); err != nil {
-			return fmt.Errorf("请求体模板语法错误: %w", err)
+			return fmt.Errorf("синтаксическая ошибка шаблона тела запроса: %w", err)
 		}
 	}
 	return nil
@@ -147,11 +147,11 @@ func renderWebhookBody(tpl string, m Message) (string, error) {
 	}
 	t, err := parseWebhookTemplate(tpl)
 	if err != nil {
-		return "", fmt.Errorf("请求体模板语法错误: %w", err)
+		return "", fmt.Errorf("синтаксическая ошибка шаблона тела запроса: %w", err)
 	}
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, newWebhookTemplateData(m)); err != nil {
-		return "", fmt.Errorf("渲染请求体模板失败: %w", err)
+		return "", fmt.Errorf("не удалось отрендерить шаблон тела запроса: %w", err)
 	}
 	return buf.String(), nil
 }

@@ -279,15 +279,15 @@ func (s *Server) updateApply(w http.ResponseWriter, r *http.Request) {
 	}
 	cmp, comparable := selfupdate.CompareVersions(current, rel.TagName)
 	if !comparable {
-		writeErr(w, 400, fmt.Sprintf("当前版本 %q 不是正式发布版本，已禁用一键更新", current))
+		writeErr(w, 400, fmt.Sprintf("текущая версия %q не является официальным релизом, обновление в один клик отключено", current))
 		return
 	}
 	if cmp >= 0 {
-		writeErr(w, 400, fmt.Sprintf("当前已是最新版本 %s", current))
+		writeErr(w, 400, fmt.Sprintf("текущая версия %s уже является последней", current))
 		return
 	}
 	if !updHub.begin(rel.TagName) {
-		writeErr(w, 409, "已有一个更新正在进行中")
+		writeErr(w, 409, "обновление уже выполняется")
 		return
 	}
 
@@ -299,10 +299,10 @@ func (s *Server) updateApply(w http.ResponseWriter, r *http.Request) {
 		})
 		updHub.finish(err)
 		if err != nil {
-			log.Printf("[update] 更新失败：%v", err)
+			log.Printf("[update] ошибка обновления: %v", err)
 			return
 		}
-		log.Printf("[update] %s → %s 已暂存，即将退出以完成换装", current, rel.TagName)
+		log.Printf("[update] %s → %s подготовлено, сейчас произойдёт перезапуск для завершения установки", current, rel.TagName)
 		// 留一点时间把最后一条进度推给前端，再触发退出。
 		time.Sleep(1500 * time.Millisecond)
 		requestRestart()
@@ -314,14 +314,14 @@ func (s *Server) updateApply(w http.ResponseWriter, r *http.Request) {
 // updateRollback 主动退回上一版本（换装前备份的 artex.old）。
 func (s *Server) updateRollback(w http.ResponseWriter, r *http.Request) {
 	if _, running := updHub.snapshot(); running {
-		writeErr(w, 409, "更新正在进行中，无法回滚")
+		writeErr(w, 409, "обновление уже выполняется, откат невозможен")
 		return
 	}
 	if err := selfupdate.Rollback(); err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}
-	log.Printf("[update] 已手动回滚到上一版本，即将退出以完成切换")
+	log.Printf("[update] выполнен ручной откат к предыдущей версии, сейчас произойдёт перезапуск для завершения переключения")
 	writeJSON(w, 202, map[string]any{"ok": true})
 	go func() {
 		time.Sleep(500 * time.Millisecond)

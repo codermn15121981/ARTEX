@@ -124,7 +124,7 @@ func (s *Server) agentFindingTrafficAccess(ctx context.Context, id int64, write 
 		return err
 	}
 	if f == nil {
-		return fmt.Errorf("%w：finding_id=%d。证据工具使用独立漏洞记录 ID，请从 list_task_findings / get_task_node_detail 的 finding_id 字段读取；不要传 id / finding_node_id", db.ErrFindingNotFound, id)
+		return fmt.Errorf("%w: finding_id=%d. Инструменты работы с доказательствами используют отдельный ID записи уязвимости — берите его из поля finding_id в list_task_findings / get_task_node_detail; не передавайте id / finding_node_id", db.ErrFindingNotFound, id)
 	}
 	if ri := agent.RunInfoFrom(ctx); ri.TaskID > 0 {
 		task := s.m.ResolveTask(strconv.FormatInt(ri.TaskID, 10))

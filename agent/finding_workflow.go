@@ -116,7 +116,7 @@ func (t *ToolSet) findingRefsFromHint(hintID int64, explicit []db.TrafficRef) ([
 		return nil, err
 	}
 	if n == nil || n.Kind != db.KindHint {
-		return nil, fmt.Errorf("evidence_hint_id=%d 必须是本任务的提示节点（继承提示不可直接用于绑定）", hintID)
+		return nil, fmt.Errorf("evidence_hint_id=%d должен быть узлом-подсказкой текущей задачи (унаследованные подсказки нельзя использовать для привязки напрямую)", hintID)
 	}
 	var payload struct {
 		Refs []db.TrafficRef `json:"traffic_refs"`

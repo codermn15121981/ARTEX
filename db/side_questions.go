@@ -173,7 +173,7 @@ func (d *DB) StartSideRequest(ctx context.Context, s sidequestion.Snapshot, clie
 	e, err := scanSide(tx.QueryRowContext(ctx, `SELECT `+sideCols+` FROM side_question_requests WHERE session_key=$1 AND generation=$2 AND client_id=$3`, s.Parent.Key(), generation, clientID))
 	if err == nil {
 		if e.Question != question {
-			return nil, false, fmt.Errorf("同一请求 ID 不能用于不同问题")
+			return nil, false, fmt.Errorf("один и тот же request ID нельзя использовать для разных вопросов")
 		}
 		return &e, false, tx.Commit()
 	}

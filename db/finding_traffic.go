@@ -57,7 +57,7 @@ func NormalizeTrafficRefs(refs []TrafficRef) ([]TrafficRef, error) {
 			ref.Role = "supporting"
 		}
 		if !ValidTrafficRole(ref.Role) {
-			return nil, fmt.Errorf("无效的流量用途 %q", ref.Role)
+			return nil, fmt.Errorf("недопустимое назначение трафика %q", ref.Role)
 		}
 		if !seen[ref.TrafficID] {
 			out = append(out, ref)

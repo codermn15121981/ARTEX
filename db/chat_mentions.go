@@ -52,7 +52,7 @@ func (d *DB) SearchChatMentions(ctx context.Context, kind, query string) ([]Chat
 func (d *DB) SearchChatMentionsPage(ctx context.Context, kind, query, cursor string) (ChatMentionPage, error) {
 	page := ChatMentionPage{Items: make([]ChatMention, 0)}
 	if kind != "" && !ValidChatMentionKind(kind) {
-		return page, fmt.Errorf("不支持的引用类型")
+		return page, fmt.Errorf("неподдерживаемый тип упоминания")
 	}
 	var after chatMentionCursor
 	if cursor != "" {

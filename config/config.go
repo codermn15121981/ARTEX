@@ -145,7 +145,7 @@ func PostgresDSN() (dsn, source string, err error) {
 	if db.Host != "" || db.DBName != "" || db.User != "" {
 		return db.buildDSN(), "配置文件 " + Path() + " (database 字段)", nil
 	}
-	return "", "", fmt.Errorf("未找到数据库配置：环境变量 ARTEX_PG_DSN 未设置，且配置文件 %s 未提供 database（dsn 或 host/user/dbname）。请创建该配置文件或设置环境变量后重试", Path())
+	return "", "", fmt.Errorf("конфигурация базы данных не найдена: переменная окружения ARTEX_PG_DSN не задана, а файл конфигурации %s не содержит database (dsn или host/user/dbname). Создайте этот файл конфигурации или задайте переменную окружения и повторите попытку", Path())
 }
 
 func (d Database) buildDSN() string {

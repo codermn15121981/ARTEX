@@ -270,7 +270,7 @@ func (s *Server) restoreTaskRuntimes() {
 		// clear stale 'running' intents from a prior crash/restart (no live worker
 		// owns them) so they re-claim instead of spinning forever in the UI.
 		if n, _ := t.Store.ResetRunningIntents(); n > 0 {
-			log.Printf("[engine] task %s 重置 %d 个残留 running 意图为 open", t.ID, n)
+			log.Printf("[engine] задача %s: сброшено %d оставшихся намерений в running обратно в open", t.ID, n)
 		}
 		if lifecycle.Paused {
 			s.engine.Pause(t.ID, agent.AbortPausedOnReload)
@@ -1146,7 +1146,7 @@ func (s *Server) controlIntent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.engine.beginTaskOperation(t.ID) {
-		writeErr(w, 409, "任务正在删除，无法控制意图")
+		writeErr(w, 409, "задача удаляется, управление намерением невозможно")
 		return
 	}
 	defer s.engine.decInflight(t.ID)
@@ -1203,7 +1203,7 @@ func (s *Server) rerunIntent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.engine.beginTaskOperation(t.ID) {
-		writeErr(w, 409, "任务正在删除，无法重跑意图")
+		writeErr(w, 409, "задача удаляется, перезапуск намерения невозможен")
 		return
 	}
 	defer s.engine.decInflight(t.ID)
@@ -1218,7 +1218,7 @@ func (s *Server) rerunIntent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !reopened {
-		writeErr(w, 409, "该意图不是可重跑状态(仅 blocked/exhausted/stopped 可重跑)")
+		writeErr(w, 409, "это намерение не в состоянии, допускающем перезапуск (перезапуск возможен только из blocked/exhausted/stopped)")
 		return
 	}
 	queued, err := s.admitTask(t, "resume")
@@ -1229,7 +1229,7 @@ func (s *Server) rerunIntent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	log.Printf("[task] #%s 意图 #%d 已重开(重跑)", t.ID, iid)
+	log.Printf("[task] #%s: намерение #%d переоткрыто (перезапуск)", t.ID, iid)
 	writeJSON(w, 200, map[string]any{"id": t.ID, "reopened": iid, "queued": queued})
 }
 
@@ -1242,7 +1242,7 @@ func (s *Server) rerunBlocked(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.engine.beginTaskOperation(t.ID) {
-		writeErr(w, 409, "任务正在删除，无法重跑意图")
+		writeErr(w, 409, "задача удаляется, перезапуск намерения невозможен")
 		return
 	}
 	defer s.engine.decInflight(t.ID)
@@ -1279,7 +1279,7 @@ func (s *Server) rerunBlocked(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		log.Printf("[task] #%s 批量重开 %d 条 blocked 意图", t.ID, n)
+		log.Printf("[task] #%s: массово переоткрыто %d намерений blocked", t.ID, n)
 	}
 	writeJSON(w, 200, map[string]any{"id": t.ID, "reopened": n, "queued": queued})
 }
@@ -1479,7 +1479,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		req.TimeoutSeconds = 0
 	}
 	if len(req.SourceTaskIDs) > db.MaxTaskSourceCount {
-		writeErr(w, 400, fmt.Sprintf("关联任务最多选择 %d 个", db.MaxTaskSourceCount))
+		writeErr(w, 400, fmt.Sprintf("можно выбрать не более %d связанных задач", db.MaxTaskSourceCount))
 		return
 	}
 	sourceIDs := make([]int64, 0, len(req.SourceTaskIDs))
@@ -1487,11 +1487,11 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	for _, raw := range req.SourceTaskIDs {
 		id, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
 		if err != nil || id <= 0 || seenSources[id] {
-			writeErr(w, 400, "关联任务 id 无效或重复")
+			writeErr(w, 400, "неверный или повторяющийся id связанной задачи")
 			return
 		}
 		if _, ok := s.m.Task(strconv.FormatInt(id, 10)); !ok {
-			writeErr(w, 400, fmt.Sprintf("关联任务 #%d 不存在", id))
+			writeErr(w, 400, fmt.Sprintf("связанная задача #%d не существует", id))
 			return
 		}
 		seenSources[id] = true
@@ -1499,13 +1499,13 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	}
 	companyIDs, err := db.NormalizeTaskCompanyIDs(req.CompanyIDs)
 	if err != nil {
-		writeErr(w, 400, fmt.Sprintf("关联企业无效：最多选择 %d 个有效企业", db.MaxTaskCompanyCount))
+		writeErr(w, 400, fmt.Sprintf("недопустимая связанная компания: можно выбрать не более %d действительных компаний", db.MaxTaskCompanyCount))
 		return
 	}
 	req.CompanyIDs = companyIDs
 	interceptRules, err := buildTaskInterceptRules(req.InterceptRules)
 	if err != nil {
-		writeErr(w, 400, "任务级拦截规则无效："+err.Error())
+		writeErr(w, 400, "недопустимые правила перехвата уровня задачи: "+err.Error())
 		return
 	}
 	t, err := s.m.CreateTaskWithOptions(req.Description, req.Goal, db.TaskCreateOptions{
@@ -1517,17 +1517,17 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, db.ErrTaskCategoryInvalid) || errors.Is(err, db.ErrTaskCategoryNotFound) {
-			writeErr(w, 400, "任务分类不存在或无效")
+			writeErr(w, 400, "категория задачи не существует или недействительна")
 			return
 		}
 		if errors.Is(err, db.ErrTaskCompanyIDsInvalid) || errors.Is(err, db.ErrTaskCompanyNotFound) {
-			writeErr(w, 400, "关联企业不存在或无效")
+			writeErr(w, 400, "связанная компания не существует или недействительна")
 			return
 		}
 		writeErr(w, 500, err.Error())
 		return
 	}
-	log.Printf("[task] 新建任务 #%s «%s» 目标: %s", t.ID, req.Description, req.Goal)
+	log.Printf("[task] создана новая задача #%s «%s» цель: %s", t.ID, req.Description, req.Goal)
 	// 共享的建后流程(seed + 种子意图 + 后台目标分解 + engine.Run),与 spawn_task 复用同一段。
 	// launchTask 内部异步,不阻塞 UI —— 目标分解在后台可见地进行。
 	s.launchTask(t, req.Description+" "+req.Goal, req.SeedFirstIntent != nil && *req.SeedFirstIntent)
@@ -1538,11 +1538,11 @@ func (s *Server) validateTaskProfileIDs(ids []int64) error {
 	seen := map[int64]bool{}
 	for _, id := range ids {
 		if id <= 0 || seen[id] {
-			return fmt.Errorf("LLM 配置 id 无效或重复")
+			return fmt.Errorf("неверный или повторяющийся id конфигурации LLM")
 		}
 		seen[id] = true
 		if _, ok := s.loadProfileConfig(id); !ok {
-			return fmt.Errorf("LLM 配置 #%d 不存在或未设置 API Key", id)
+			return fmt.Errorf("конфигурация LLM #%d не существует или не задан API Key", id)
 		}
 	}
 	return nil
@@ -1667,12 +1667,12 @@ func (s *Server) llmHost() string {
 func (s *Server) seed(t *Task, text string) {
 	scheme, host, port, ok := parseTarget(text)
 	if !ok {
-		log.Printf("[seed] task %s: 未能从 %q 解析出目标 host/IP，不创建站点（请手动配置 scope）", t.ID, text)
+		log.Printf("[seed] задача %s: не удалось извлечь целевой host/IP из %q, сайт не создан (настройте scope вручную)", t.ID, text)
 		return
 	}
 	// P0-1 guard: never treat the configured LLM gateway as a target.
 	if gw := s.llmHost(); gw != "" && host == gw {
-		log.Printf("[seed] task %s: 目标 %q 是 LLM 网关，拒绝作为渗透目标", t.ID, host)
+		log.Printf("[seed] задача %s: цель %q является шлюзом LLM, отклонена как цель пентеста", t.ID, host)
 		return
 	}
 
@@ -1701,7 +1701,7 @@ func (s *Server) seed(t *Task, text string) {
 			_ = t.Store.Anchor(begin, rootID)
 		}
 	}
-	log.Printf("[seed] task %s: 目标站点 %s", t.ID, u)
+	log.Printf("[seed] задача %s: целевой сайт %s", t.ID, u)
 	// 不在这里 Notify:首轮是否触发统一由 engine.Run 的 HasActiveIntent 决定(种子意图任务
 	// 跳过首轮)。seed 早于 Run 执行,若在此 Notify 会 buffered 到通道、被 plannerLoop 启动时
 	// 消费掉而绕过 Run 的门控 → 种子任务仍误触发首轮。
@@ -1716,13 +1716,13 @@ func (s *Server) seedFirstIntent(t *Task) {
 	summary := fmt.Sprintf("完成任务目标：%s（任务：%s）", t.Goal, t.Description)
 	id, err := t.Store.AddIntent(map[string]any{"summary": summary}, 8, nil, "seed")
 	if err != nil {
-		log.Printf("[seed] task %s: 下发种子意图失败: %v", t.ID, err)
+		log.Printf("[seed] задача %s: не удалось отправить начальное намерение: %v", t.ID, err)
 		return
 	}
 	if origin, _ := t.Store.OriginFactID(); origin > 0 {
 		_ = t.Store.Link(origin, db.RelDerivedFrom, id)
 	}
-	log.Printf("[seed] task %s: 已下发种子意图 #%d", t.ID, id)
+	log.Printf("[seed] задача %s: отправлено начальное намерение #%d", t.ID, id)
 }
 
 func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
@@ -1746,7 +1746,7 @@ func (s *Server) taskCoverage(w http.ResponseWriter, r *http.Request) {
 	}
 	as := s.m.Assets()
 	if as == nil {
-		writeErr(w, 503, "asset store 未启用")
+		writeErr(w, 503, "asset store не включён")
 		return
 	}
 	// 资产覆盖度功能关闭 → 短路返回 {enabled:false}，前端据此隐藏覆盖度卡片/进度。
@@ -1774,7 +1774,7 @@ func (s *Server) taskCoverageGraph(w http.ResponseWriter, r *http.Request) {
 	}
 	as := s.m.Assets()
 	if as == nil {
-		writeErr(w, 503, "asset store 未启用")
+		writeErr(w, 503, "asset store не включён")
 		return
 	}
 	taskID, _ := strconv.ParseInt(t.ID, 10, 64)
@@ -1796,7 +1796,7 @@ func (s *Server) taskAssetRefs(w http.ResponseWriter, r *http.Request) {
 	}
 	assetID, _ := strconv.ParseInt(r.URL.Query().Get("asset_id"), 10, 64)
 	if assetID <= 0 {
-		writeErr(w, 400, "需要 asset_id")
+		writeErr(w, 400, "требуется asset_id")
 		return
 	}
 	refs, err := t.Store.AssetRefsWithSources(assetID)
@@ -1830,7 +1830,7 @@ func (s *Server) taskScopeList(w http.ResponseWriter, r *http.Request) {
 	}
 	as := s.m.Assets()
 	if as == nil {
-		writeErr(w, 503, "asset store 未启用")
+		writeErr(w, 503, "asset store не включён")
 		return
 	}
 	taskID, _ := strconv.ParseInt(t.ID, 10, 64)
@@ -1850,7 +1850,7 @@ func (s *Server) taskScopeAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	as := s.m.Assets()
 	if as == nil {
-		writeErr(w, 503, "asset store 未启用")
+		writeErr(w, 503, "asset store не включён")
 		return
 	}
 	var body struct {
@@ -1879,7 +1879,7 @@ func (s *Server) taskScopeDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	as := s.m.Assets()
 	if as == nil {
-		writeErr(w, 503, "asset store 未启用")
+		writeErr(w, 503, "asset store не включён")
 		return
 	}
 	taskID, _ := strconv.ParseInt(t.ID, 10, 64)
@@ -2293,7 +2293,7 @@ func (s *Server) patchFinding(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !notified && from != *body.Status {
-			log.Printf("[notify] 状态变更事件未登记 finding=%d %s→%s（状态已更新）", id, from, *body.Status)
+			log.Printf("[notify] событие изменения статуса не зарегистрировано finding=%d %s→%s (статус обновлён)", id, from, *body.Status)
 		}
 	}
 	if body.Severity != nil {
@@ -3271,7 +3271,7 @@ func (s *Server) getTrafficBlob(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", hash+".bin"))
 	if _, err := io.Copy(w, f); err != nil {
-		log.Printf("[traffic] 下载 blob %s 中断：%v", hash, err)
+		log.Printf("[traffic] загрузка blob %s прервана: %v", hash, err)
 	}
 }
 
@@ -3345,7 +3345,7 @@ func notifyDigestIntervalMin(pg *db.DB) int {
 func (s *Server) pgDetectPython(w http.ResponseWriter, r *http.Request) {
 	p := detectPython()
 	if p == "" {
-		writeErr(w, 404, "未检测到 python(python3/python 均不在 PATH)")
+		writeErr(w, 404, "python не обнаружен (ни python3, ни python не найдены в PATH)")
 		return
 	}
 	if err := s.m.pg.SetSetting(settingPythonInterp, p); err != nil {
@@ -3426,7 +3426,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 		// 留着尾部斜杠会产出 "//function/..." 这种双斜杠路径。
 		base := trimTrailingSlash(strings.TrimSpace(*req.NotifyBaseURL))
 		if base != "" && !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
-			writeErr(w, 400, "回链地址需以 http:// 或 https:// 开头")
+			writeErr(w, 400, "адрес обратной ссылки должен начинаться с http:// или https://")
 			return
 		}
 		if err := s.m.pg.SetSetting(settingNotifyPublicBaseURL, base); err != nil {
@@ -3437,7 +3437,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 	if req.NotifyDigestMins != nil {
 		// 下限 1 分钟:更短的周期等于实时推送,那样应该直接把渠道改成 realtime 模式。
 		if *req.NotifyDigestMins < 1 || *req.NotifyDigestMins > 24*60 {
-			writeErr(w, 400, "汇总周期需在 1 到 1440 分钟之间")
+			writeErr(w, 400, "период сводки должен быть от 1 до 1440 минут")
 			return
 		}
 		if err := s.m.pg.SetSetting(settingNotifyDigestMinutes, strconv.Itoa(*req.NotifyDigestMins)); err != nil {
@@ -3645,7 +3645,7 @@ func (s *Server) newMainSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.engine.IsDeleting(t.ID) {
-		writeErr(w, 409, "任务正在删除，无法新建会话")
+		writeErr(w, 409, "задача удаляется, создание нового диалога невозможно")
 		return
 	}
 	m, err := t.Store.NewMainSession()
@@ -3663,7 +3663,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.engine.IsDeleting(t.ID) {
-		writeErr(w, 409, "任务正在删除，无法发送新消息")
+		writeErr(w, 409, "задача удаляется, отправка нового сообщения невозможна")
 		return
 	}
 	// 注意:任务暂停(paused)不拦截主 Agent 对话。主 Agent 编排会话独立于 planner/
@@ -3687,12 +3687,12 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 	s.chatMu.Lock()
 	if s.engine.IsDeleting(t.ID) {
 		s.chatMu.Unlock()
-		writeErr(w, 409, "任务正在删除，无法发送新消息")
+		writeErr(w, 409, "задача удаляется, отправка нового сообщения невозможна")
 		return
 	}
 	if s.chatBusy[t.ID] {
 		s.chatMu.Unlock()
-		writeErr(w, 409, "主 Agent 正在处理上一条消息，请稍候")
+		writeErr(w, 409, "главный агент ещё обрабатывает предыдущее сообщение, подождите")
 		return
 	}
 	ctx, cancel := context.WithCancelCause(s.ctx)

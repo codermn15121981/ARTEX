@@ -40,11 +40,11 @@ func (s *Server) wireInterceptReviewer() {
 			}
 		}
 		if profileID == 0 {
-			return intercept.Decision{}, fmt.Errorf("未配置可用的裁判模型")
+			return intercept.Decision{}, fmt.Errorf("не настроена доступная модель-судья")
 		}
 		prov, _, ok := s.providerForProfile(profileID)
 		if !ok {
-			return intercept.Decision{ProfileID: profileID}, fmt.Errorf("裁判模型 profile %d 不可用", profileID)
+			return intercept.Decision{ProfileID: profileID}, fmt.Errorf("модель-судья profile %d недоступна", profileID)
 		}
 		// Tag this call's usage as the "judge" lane so the config page can report
 		// how much the fallback approval has spent, separate from model profiles.
@@ -55,7 +55,7 @@ func (s *Server) wireInterceptReviewer() {
 		}
 		v := intercept.ParseVerdict(text)
 		if v.Action == "" {
-			return intercept.Decision{ProfileID: profileID}, fmt.Errorf("模型裁决格式无效，必须包含裁决、实际操作、成功后的后果和命中规则")
+			return intercept.Decision{ProfileID: profileID}, fmt.Errorf("неверный формат вердикта модели: он должен содержать решение, фактическое действие, последствия при успехе и сработавшее правило")
 		}
 		return intercept.Decision{Action: v.Action, Message: v.Reason, ProfileID: profileID}, nil
 	})
@@ -325,12 +325,12 @@ func interceptFilterParams(q url.Values) (db.InterceptApprovalFilter, error) {
 	switch filter.Status {
 	case "", "pending", "allowed", "denied", "timeout":
 	default:
-		return filter, fmt.Errorf("status 必须是 pending、allowed、denied 或 timeout")
+		return filter, fmt.Errorf("status должен быть pending, allowed, denied или timeout")
 	}
 	switch filter.DecisionSource {
 	case "", "model", "rule", "unknown":
 	default:
-		return filter, fmt.Errorf("decision_source 必须是 model、rule 或 unknown")
+		return filter, fmt.Errorf("decision_source должен быть model, rule или unknown")
 	}
 	return filter, nil
 }
@@ -364,7 +364,7 @@ func (s *Server) interceptDecide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Decision != "allowed" && req.Decision != "denied" {
-		writeErr(w, 400, "decision 必须是 allowed 或 denied")
+		writeErr(w, 400, "decision должен быть allowed или denied")
 		return
 	}
 	if err := s.m.interceptor.Decide(id, req.Decision == "allowed"); err != nil {
@@ -429,13 +429,13 @@ func (s *Server) interceptSetJudgeConfig(w http.ResponseWriter, r *http.Request)
 	switch req.FailAction {
 	case "allow", "ask", "deny":
 	default:
-		writeErr(w, 400, "fail_action 必须是 allow、ask 或 deny")
+		writeErr(w, 400, "fail_action должен быть allow, ask или deny")
 		return
 	}
 	switch req.AskTimeoutAction {
 	case "allow", "deny":
 	default:
-		writeErr(w, 400, "ask_timeout_action 必须是 allow 或 deny")
+		writeErr(w, 400, "ask_timeout_action должен быть allow или deny")
 		return
 	}
 	if err := s.m.interceptor.SetJudgeConfig(req); err != nil {
@@ -480,29 +480,29 @@ type interceptRuleReq struct {
 
 func validateInterceptRuleReq(req interceptRuleReq) error {
 	if req.Name == "" {
-		return fmt.Errorf("name 不能为空")
+		return fmt.Errorf("name не может быть пустым")
 	}
 	switch req.MatchTarget {
 	case "tool_name", "tool_input":
 	default:
-		return fmt.Errorf("match_target 必须是 tool_name 或 tool_input")
+		return fmt.Errorf("match_target должен быть tool_name или tool_input")
 	}
 	switch req.MatchType {
 	case "string", "regex":
 	default:
-		return fmt.Errorf("match_type 必须是 string 或 regex")
+		return fmt.Errorf("match_type должен быть string или regex")
 	}
 	if req.Pattern == "" {
-		return fmt.Errorf("pattern 不能为空")
+		return fmt.Errorf("pattern не может быть пустым")
 	}
 	switch req.Action {
 	case "allow", "deny", "ask":
 	default:
-		return fmt.Errorf("action 必须是 allow、deny 或 ask")
+		return fmt.Errorf("action должен быть allow, deny или ask")
 	}
 	if req.MatchType == "regex" {
 		if _, err := regexp.Compile(req.Pattern); err != nil {
-			return fmt.Errorf("pattern 不是有效正则：%w", err)
+			return fmt.Errorf("pattern не является допустимым регулярным выражением: %w", err)
 		}
 	}
 	return nil
@@ -565,11 +565,11 @@ func (s *Server) interceptExecution(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if conv == nil {
-				writeErr(w, http.StatusGone, "对话已被删除")
+				writeErr(w, http.StatusGone, "Диалог был удалён")
 				return
 			}
 		}
-		writeErr(w, 404, "审批记录已被删除或不存在")
+		writeErr(w, 404, "Запись согласования удалена или не существует")
 		return
 	}
 	writeJSON(w, 200, map[string]any{"conversation_id": target.ConversationID, "task_id": target.TaskID, "session": target.Session, "seq": target.Seq, "items": activityDTOs(target.Items)})

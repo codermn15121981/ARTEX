@@ -83,7 +83,7 @@ func (c emailChannel) Send(ctx context.Context, cfg map[string]any, m Message) (
 	if !implicitTLS {
 		if ok, _ := client.Extension("STARTTLS"); ok {
 			if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-				return 0, fmt.Errorf("STARTTLS 失败: %w", err)
+				return 0, fmt.Errorf("сбой STARTTLS: %w", err)
 			}
 		}
 	}
@@ -93,9 +93,9 @@ func (c emailChannel) Send(ctx context.Context, cfg map[string]any, m Message) (
 			// 这是**正确**的安全行为，不能绕过，但需要把原因翻译清楚——
 			// 否则使用者只会看到「unencrypted connection」而不知道该怎么办。
 			if strings.Contains(err.Error(), "unencrypted connection") {
-				return 0, Permanent(fmt.Errorf("拒发凭据：连接未加密。请启用 TLS，或改用 465 端口(隐式 TLS)，或把「启用 TLS」勾上 (%w)", err))
+				return 0, Permanent(fmt.Errorf("отправка учётных данных отклонена: соединение не зашифровано. Включите TLS, либо используйте порт 465 (неявный TLS), либо поставьте флажок «Включить TLS» (%w)", err))
 			}
-			return 0, Permanent(fmt.Errorf("SMTP 认证失败: %w", err))
+			return 0, Permanent(fmt.Errorf("ошибка аутентификации SMTP: %w", err))
 		}
 	}
 	if err := client.Mail(from); err != nil {
@@ -108,13 +108,13 @@ func (c emailChannel) Send(ctx context.Context, cfg map[string]any, m Message) (
 	}
 	w, err := client.Data()
 	if err != nil {
-		return 0, fmt.Errorf("SMTP DATA 失败: %w", err)
+		return 0, fmt.Errorf("ошибка команды SMTP DATA: %w", err)
 	}
 	if _, err := w.Write([]byte(msg)); err != nil {
-		return 0, fmt.Errorf("写入邮件正文失败: %w", err)
+		return 0, fmt.Errorf("не удалось записать тело письма: %w", err)
 	}
 	if err := w.Close(); err != nil {
-		return 0, fmt.Errorf("提交邮件失败: %w", err)
+		return 0, fmt.Errorf("не удалось отправить письмо: %w", err)
 	}
 	// Quit 失败不影响「邮件已被服务器接收」这个事实，因此忽略其错误。
 	_ = client.Quit()
@@ -145,13 +145,13 @@ func emailDial(ctx context.Context, addr, host string, implicitTLS bool) (*smtp.
 		conn, err = d.DialContext(ctx, "tcp", addr)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("连接 SMTP 服务器失败: %w", err)
+		return nil, fmt.Errorf("не удалось подключиться к SMTP-серверу: %w", err)
 	}
 	_ = conn.SetDeadline(time.Now().Add(emailSessionTimeout))
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("SMTP 握手失败: %w", err)
+		return nil, fmt.Errorf("ошибка SMTP-рукопожатия: %w", err)
 	}
 	return client, nil
 }

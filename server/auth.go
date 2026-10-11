@@ -60,7 +60,7 @@ func loadOrCreateJWTKey(keyDir, dataDir string) ([]byte, error) {
 			if data, rerr := os.ReadFile(legacy); rerr == nil {
 				if werr := os.WriteFile(path, data, 0o600); werr == nil {
 					_ = os.Remove(legacy)
-					log.Printf("[auth] JWT key 已从 %s 迁移到 %s（移出可浏览工作区）", legacy, path)
+					log.Printf("[auth] JWT key перенесён из %s в %s (убран из просматриваемого рабочего пространства)", legacy, path)
 				}
 			}
 		}
@@ -79,7 +79,7 @@ func loadOrCreateJWTKey(keyDir, dataDir string) ([]byte, error) {
 	if err := os.WriteFile(path, buf, 0600); err != nil {
 		return nil, fmt.Errorf("write jwt key: %w", err)
 	}
-	log.Printf("[auth] 新 JWT key 已写入 %s", path)
+	log.Printf("[auth] Новый JWT key записан в %s", path)
 	return buf, nil
 }
 
@@ -126,11 +126,11 @@ func (s *Server) requireAuth(h http.Handler) http.Handler {
 		}
 		tok := extractToken(r)
 		if tok == "" {
-			writeErr(w, 401, "未授权")
+			writeErr(w, 401, "Не авторизован")
 			return
 		}
 		if !verifyJWT(tok, s.jwtKey) {
-			writeErr(w, 401, "token 无效或已过期")
+			writeErr(w, 401, "token недействителен или истёк")
 			return
 		}
 		h.ServeHTTP(w, r)
@@ -166,14 +166,14 @@ func (s *Server) authInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing != "" {
-		writeErr(w, 403, "密码已设置")
+		writeErr(w, 403, "Пароль уже установлен")
 		return
 	}
 	var req struct {
 		Password string `json:"password"`
 	}
 	if err := decode(r, &req); err != nil || req.Password == "" {
-		writeErr(w, 400, "密码不能为空")
+		writeErr(w, 400, "Пароль не может быть пустым")
 		return
 	}
 	if msg := validatePassword(req.Password); msg != "" {
@@ -182,7 +182,7 @@ func (s *Server) authInit(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		writeErr(w, 500, "密码加密失败")
+		writeErr(w, 500, "Не удалось зашифровать пароль")
 		return
 	}
 	// 用 INSERT ... ON CONFLICT DO NOTHING 而不是 upsert：上面那次 GetSetting 只是
@@ -190,16 +190,16 @@ func (s *Server) authInit(w http.ResponseWriter, r *http.Request) {
 	// 这期间别的请求完全可能先把密码设好，而读检查本身也可能因故障而失效。
 	inserted, err := pg.InsertSettingIfAbsent(authPassKey, string(hash))
 	if err != nil {
-		writeErr(w, 500, "保存失败: "+err.Error())
+		writeErr(w, 500, "Не удалось сохранить: "+err.Error())
 		return
 	}
 	if !inserted {
-		writeErr(w, 403, "密码已设置")
+		writeErr(w, 403, "Пароль уже установлен")
 		return
 	}
 	tok, err := signJWT(s.jwtKey)
 	if err != nil {
-		writeErr(w, 500, "token 生成失败")
+		writeErr(w, 500, "Не удалось сгенерировать token")
 		return
 	}
 	writeJSON(w, 200, map[string]any{"token": tok})
@@ -214,7 +214,7 @@ func (s *Server) authChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !verifyJWT(extractToken(r), s.jwtKey) {
-		writeErr(w, 401, "未授权")
+		writeErr(w, 401, "Не авторизован")
 		return
 	}
 	var req struct {
@@ -222,11 +222,11 @@ func (s *Server) authChangePassword(w http.ResponseWriter, r *http.Request) {
 		NewPassword string `json:"new_password"`
 	}
 	if err := decode(r, &req); err != nil {
-		writeErr(w, 400, "请求格式错误")
+		writeErr(w, 400, "Неверный формат запроса")
 		return
 	}
 	if req.NewPassword == "" {
-		writeErr(w, 400, "新密码不能为空")
+		writeErr(w, 400, "Новый пароль не может быть пустым")
 		return
 	}
 	if msg := validatePassword(req.NewPassword); msg != "" {
@@ -239,20 +239,20 @@ func (s *Server) authChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok || hash == "" {
-		writeErr(w, 403, "密码未初始化，请先设置密码")
+		writeErr(w, 403, "Пароль не инициализирован, сначала установите пароль")
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.OldPassword)); err != nil {
-		writeErr(w, 401, "当前密码错误")
+		writeErr(w, 401, "Неверный текущий пароль")
 		return
 	}
 	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		writeErr(w, 500, "密码加密失败")
+		writeErr(w, 500, "Не удалось зашифровать пароль")
 		return
 	}
 	if err := pg.SetSetting(authPassKey, string(newHash)); err != nil {
-		writeErr(w, 500, "保存失败: "+err.Error())
+		writeErr(w, 500, "Не удалось сохранить: "+err.Error())
 		return
 	}
 	writeJSON(w, 200, map[string]any{"ok": true})
@@ -269,11 +269,11 @@ func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := decode(r, &req); err != nil {
-		writeErr(w, 400, "请求格式错误")
+		writeErr(w, 400, "Неверный формат запроса")
 		return
 	}
 	if req.Username != "ARTEX" {
-		writeErr(w, 401, "用户名或密码错误")
+		writeErr(w, 401, "Неверное имя пользователя или пароль")
 		return
 	}
 	hash, ok, err := pg.GetSetting(authPassKey)
@@ -282,16 +282,16 @@ func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok || hash == "" {
-		writeErr(w, 403, "密码未初始化，请先设置密码")
+		writeErr(w, 403, "Пароль не инициализирован, сначала установите пароль")
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-		writeErr(w, 401, "用户名或密码错误")
+		writeErr(w, 401, "Неверное имя пользователя или пароль")
 		return
 	}
 	tok, err := signJWT(s.jwtKey)
 	if err != nil {
-		writeErr(w, 500, "token 生成失败")
+		writeErr(w, 500, "Не удалось сгенерировать token")
 		return
 	}
 	writeJSON(w, 200, map[string]any{"token": tok})
